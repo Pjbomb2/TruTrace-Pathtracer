@@ -20,10 +20,14 @@ namespace TrueTrace {
             DeformableToggle.RegisterValueChangedCallback(evt => {t.IsDeformable = evt.newValue;});
             Toggle ImposterToggle = new Toggle() {value = t.RenderImposters, text = "Instanced Imposter"};
             ImposterToggle.RegisterValueChangedCallback(evt => {t.RenderImposters = evt.newValue;});
+            FloatField WMAXField = new FloatField() {value = t.WMAX};
+            WMAXField.RegisterValueChangedCallback(evt => {t.WMAX = evt.newValue;});
+
             // Button ToFileButton = new Button(() => {t.SaveToFile();});
             // ToFileButton.text = "To File";
             Root.Add(DeformableToggle);
             Root.Add(ImposterToggle);
+            Root.Add(WMAXField);
             // Root.Add(ToFileButton);
             return Root;
         }

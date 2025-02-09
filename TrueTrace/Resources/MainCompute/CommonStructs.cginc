@@ -22,6 +22,18 @@ struct CudaTriangleB {
 	uint IsEmissive;
 };
 
+struct Prism {
+	float3 v0;
+	float3 v1;
+	float3 v2;
+	
+	float3 e0;
+	float3 e1;
+	float3 e2;
+};
+
+StructuredBuffer<Prism> PrismBuffer;
+
 StructuredBuffer<CudaTriangleA> AggTrisA;
 StructuredBuffer<CudaTriangleB> AggTrisB;
 
@@ -138,6 +150,7 @@ struct MaterialData {//56
 	int2 SecondaryAlbedoTex;
 	int2 SecondaryAlbedoMask;
     int2 SecondaryNormalTex;
+    int2 DisplacementTex;
 	float3 surfaceColor;
 	float emission;
 	float3 EmissionColor;
@@ -182,6 +195,8 @@ struct MaterialData {//56
 	float4 SecondaryNormalTexScaleOffset;
     float SecondaryNormalTexBlend;
     float DetailNormalStrength;
+    float4 DisplacementTexScaleOffset;
+    float RotationDisplacement;
 };
 
 
@@ -197,6 +212,7 @@ struct RayData {//128 bit aligned
 	float3 direction;
 	float last_pdf;
 	uint4 hits;
+	uint Norm;
 };
 RWStructuredBuffer<RayData> GlobalRays;
 

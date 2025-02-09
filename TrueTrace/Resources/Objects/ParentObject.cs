@@ -68,6 +68,7 @@ namespace TrueTrace {
         [HideInInspector] public ComputeBuffer LightTreeBuffer;
         [HideInInspector] public ComputeBuffer TriBuffer;
         [HideInInspector] public ComputeBuffer BVHBuffer;
+        [HideInInspector] public ComputeBuffer PrismBuffer;
         public string Name;
         [HideInInspector] public GraphicsBuffer[] VertexBuffers;
         [HideInInspector] public ComputeBuffer[] IndexBuffers;
@@ -76,6 +77,7 @@ namespace TrueTrace {
         private unsafe NativeArray<AABB> TrianglesArray;
         private unsafe AABB* Triangles;
         [HideInInspector] public CudaTriangle[] AggTriangles;
+        [HideInInspector] public Prism[] AggPrisms;
         [HideInInspector] public Vector3 ParentScale;
         [HideInInspector] public List<LightTriData> LightTriangles;
         [HideInInspector] private List<Vector3> LightTriNorms;//Test to see if I can get rrid of this alltogether and just calculate the normal based off cross...
@@ -179,6 +181,7 @@ namespace TrueTrace {
             CommonFunctions.DeepClean(ref NodePair);
             CommonFunctions.DeepClean(ref ToBVHIndex);
             CommonFunctions.DeepClean(ref AggTriangles);
+            CommonFunctions.DeepClean(ref AggPrisms);
             CommonFunctions.DeepClean(ref AggNodes);
             CommonFunctions.DeepClean(ref ForwardStack);
             CommonFunctions.DeepClean(ref LightTriNorms);
@@ -217,6 +220,7 @@ namespace TrueTrace {
                 LightTreeBuffer?.ReleaseSafe();
                 TriBuffer?.Release();
                 BVHBuffer?.Release();
+                PrismBuffer?.Release();
             }
             if(LBVH != null) {
                 LBVH.ClearAll();
@@ -254,6 +258,7 @@ namespace TrueTrace {
                 LightTreeBuffer.ReleaseSafe();
                 TriBuffer.Release();
                 BVHBuffer.Release();
+                PrismBuffer.Release();
             }
             ClearAll();
         }
@@ -300,6 +305,7 @@ namespace TrueTrace {
                 if (LightTriBuffer != null) LightTriBuffer.Release();
                 if (TriBuffer != null) TriBuffer.Release();
                 if (BVHBuffer != null) BVHBuffer.Release();
+                if (PrismBuffer != null) PrismBuffer.Release();
                 if (LightTreeBuffer != null) LightTreeBuffer.Release();
                   if(AggTriangles != null) {
                     if(LightTriangles.Count == 0) {
@@ -318,6 +324,7 @@ namespace TrueTrace {
 #endif
                     }
                     TriBuffer = new ComputeBuffer(AggTriangles.Length, CommonFunctions.GetStride<CudaTriangle>());
+                    PrismBuffer = new ComputeBuffer(AggTriangles.Length, CommonFunctions.GetStride<Prism>());
                     BVHBuffer = new ComputeBuffer(AggNodes.Length, 80);
                     if(HasLightTriangles) {
                         LightTriBuffer.SetData(LightTriangles);
@@ -329,6 +336,7 @@ namespace TrueTrace {
 
                     }
                     TriBuffer.SetData(AggTriangles);
+                    PrismBuffer.SetData(AggPrisms);
                     BVHBuffer.SetData(AggNodes);
                 }
             }
@@ -350,6 +358,8 @@ namespace TrueTrace {
         public List<Texture> SecondaryAlbedoTexMasks;
         public List<int> SecondaryAlbedoTexMaskChannelIndex;
         public List<Texture> SecondaryAlbedoTexs;
+        public List<Texture> DisplacementTexs;
+        public List<int> DisplacementTexChannelIndex;
 
 
         #if AccurateLightTris
@@ -441,11 +451,13 @@ namespace TrueTrace {
             MemorySafeClear<Texture>(ref MatCapMasks);
             MemorySafeClear<Texture>(ref SecondaryAlbedoTexs);
             MemorySafeClear<Texture>(ref SecondaryAlbedoTexMasks);
+            MemorySafeClear<Texture>(ref DisplacementTexs);
             MemorySafeClear<int>(ref RoughnessTexChannelIndex);
             MemorySafeClear<int>(ref MetallicTexChannelIndex);
             MemorySafeClear<int>(ref AlphaTexChannelIndex);
             MemorySafeClear<int>(ref MatCapMaskChannelIndex);
             MemorySafeClear<int>(ref SecondaryAlbedoTexMaskChannelIndex);
+            MemorySafeClear<int>(ref DisplacementTexChannelIndex);
             int CurMatIndex = 0;
             Mesh mesh;
             RayObjectTextureIndex TempObj = new RayObjectTextureIndex();
@@ -522,6 +534,11 @@ namespace TrueTrace {
                             } while(CurrentPair != null);
                         }
                         switch((TexturePurpose)TexPurpose) {
+                            case(TexturePurpose.Displacement):
+                                Result = TextureParse(ref TempScale, SharedMaterials[i], TexName, ref DisplacementTexs, ref TempIndex); 
+                                CurMat.DisplacementTex.x = TempIndex; 
+                                if(Result == 1) DisplacementTexChannelIndex.Add(ReadIndex);
+                            break;
                             case(TexturePurpose.SecondaryNormalTexture):
                                 if(JustCreated) TextureParseScaleOffset(SharedMaterials[i], TexName, ref obj.SecondaryNormalTexScaleOffset[i]);
                                 Result = TextureParse(ref TempScale, SharedMaterials[i], TexName, ref SecondaryNormalTexs, ref TempIndex); 
@@ -581,6 +598,7 @@ namespace TrueTrace {
                     if(JustCreated) {
                         CurMat.SecondaryNormalTexScaleOffset = TempScale;
                         CurMat.SecondaryAlbedoTexScaleOffset = TempScale;
+                        CurMat.DisplacementTexScaleOffset = TempScale;
                         CurMat.AlbedoTextureScale = TempScale;
                         CurMat.SecondaryTextureScaleOffset = TempScale;
                         CurMat.NormalTexScaleOffset = TempScale;
@@ -1262,7 +1280,7 @@ namespace TrueTrace {
             float height = Vector3.Cross(sideAB, sideBC).magnitude;
             return new Vector2(width, height);
         }
-
+        public float WMAX = 1.0f;
 
         public unsafe async Task BuildTotal() {
             // if(HasCompleted) return;
@@ -1274,6 +1292,7 @@ namespace TrueTrace {
             TrianglesArray = new NativeArray<AABB>((TransformIndexes[TransformIndexes.Count - 1].VertexStart + TransformIndexes[TransformIndexes.Count - 1].VertexCount) / 3, Unity.Collections.Allocator.TempJob, NativeArrayOptions.UninitializedMemory);
             Triangles = (AABB*)NativeArrayUnsafeUtility.GetUnsafePtr(TrianglesArray);
             AggTriangles = new CudaTriangle[(TransformIndexes[TransformIndexes.Count - 1].VertexStart + TransformIndexes[TransformIndexes.Count - 1].VertexCount) / 3];
+            AggPrisms = new Prism[(TransformIndexes[TransformIndexes.Count - 1].VertexStart + TransformIndexes[TransformIndexes.Count - 1].VertexCount) / 3];
             int OffsetReal;
             for (int i = 0; i < TotalObjects; i++) {//Transforming so all child objects are in the same object space
                 Matrix4x4 ChildMat = CachedTransforms[i + 1].WTL.inverse;
@@ -1345,9 +1364,34 @@ namespace TrueTrace {
 
                     TempTri.MatDat = (uint)CurMeshData.MatDat[OffsetReal];
                     TempTri.IsEmissive = 0;
+                    
+                    Vector3 GeomNorm = -(Vector3.Cross(TempTri.posedge1.normalized, TempTri.posedge2.normalized)).normalized;
+                    WMAX = 0.041f;
+
+
+                    AggPrisms[OffsetReal].v0 = TempTri.pos0;
+                    AggPrisms[OffsetReal].v1 = TempTri.pos0 + TempTri.posedge1;
+                    AggPrisms[OffsetReal].v2 = TempTri.pos0 + TempTri.posedge2;
+                    float Val = Vector3.Dot(-CommonFunctions.UnpackOctahedral(TempTri.norm0), GeomNorm);
+                    if(Mathf.Abs(Val) < 0.00001f) Val = 0;
+                    else Val = 1.0f / Val;
+
+                    AggPrisms[OffsetReal].e0 = AggPrisms[OffsetReal].v0 + WMAX * Val * -CommonFunctions.UnpackOctahedral(TempTri.norm0);
+                    Val = Vector3.Dot(-CommonFunctions.UnpackOctahedral(TempTri.norm1), GeomNorm);
+                    if(Mathf.Abs(Val) < 0.00001f) Val = 0;
+                    else Val = 1.0f / Val;
+                    AggPrisms[OffsetReal].e1 = AggPrisms[OffsetReal].v1 + WMAX * Val * -CommonFunctions.UnpackOctahedral(TempTri.norm1);
+                    Val = Vector3.Dot(-CommonFunctions.UnpackOctahedral(TempTri.norm2), GeomNorm);
+                    if(Mathf.Abs(Val) < 0.00001f) Val = 0;
+                    else Val = 1.0f / Val;
+                    AggPrisms[OffsetReal].e2 = AggPrisms[OffsetReal].v2 + WMAX * Val * -CommonFunctions.UnpackOctahedral(TempTri.norm2);
+
                     AggTriangles[OffsetReal] = TempTri;
                     Triangles[OffsetReal].Create(V1, V2);
                     Triangles[OffsetReal].Extend(V3);
+                    Triangles[OffsetReal].Extend(AggPrisms[OffsetReal].e0);
+                    Triangles[OffsetReal].Extend(AggPrisms[OffsetReal].e1);
+                    Triangles[OffsetReal].Extend(AggPrisms[OffsetReal].e2);
                     Triangles[OffsetReal].Validate(ParentScale);
 
                     if (_Materials[(int)TempTri.MatDat].emission > 0.0f) {
@@ -1420,9 +1464,15 @@ namespace TrueTrace {
                 {//Compile Triangles
                     int TriLength = AggTriangles.Length;
                     NativeArray<CudaTriangle> Vector3Array = new NativeArray<CudaTriangle>(AggTriangles, Unity.Collections.Allocator.TempJob);
+                    NativeArray<Prism> Vector3Array2 = new NativeArray<Prism>(AggPrisms, Unity.Collections.Allocator.TempJob);
                     CudaTriangle* VecPointer = (CudaTriangle*)NativeArrayUnsafeUtility.GetUnsafePtr(Vector3Array);
-                    for (int i = 0; i < TriLength; i++) AggTriangles[BVH.cwbvh_indices[i]] = VecPointer[i];
+                    Prism* VecPointer2 = (Prism*)NativeArrayUnsafeUtility.GetUnsafePtr(Vector3Array2);
+                    for (int i = 0; i < TriLength; i++) {
+                        AggTriangles[BVH.cwbvh_indices[i]] = VecPointer[i];
+                        AggPrisms[BVH.cwbvh_indices[i]] = VecPointer2[i];
+                    }
                     Vector3Array.Dispose();
+                    Vector3Array2.Dispose();
                 }
                 AggNodes = new BVHNode8DataCompressed[BVH.cwbvhnode_count];
                 CommonFunctions.Aggregate(ref AggNodes, BVH);

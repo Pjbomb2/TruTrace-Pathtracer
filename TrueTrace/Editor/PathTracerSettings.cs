@@ -867,7 +867,8 @@ Toolbar toolbar;
                                        MatCapMask,
                                        SecondaryAlbedoTexture,
                                        SecondaryAlbedoTextureMask,
-                                       SecondaryNormalTexture
+                                       SecondaryNormalTexture,
+                                       DisplacementTexture
                                        };
 
       VisualElement MaterialPairingMenu;
@@ -933,6 +934,7 @@ Toolbar toolbar;
                      case((int)Properties.SecondaryAlbedoTexture):Purpose = (int)TexturePurpose.SecondaryAlbedoTexture;break;
                      case((int)Properties.SecondaryAlbedoTextureMask):Purpose = (int)TexturePurpose.SecondaryAlbedoTextureMask;break;
                      case((int)Properties.SecondaryNormalTexture):Purpose = (int)TexturePurpose.SecondaryNormalTexture;break;
+                     case((int)Properties.DisplacementTexture):Purpose = (int)TexturePurpose.Displacement;break;
                   }
 
 
@@ -950,6 +952,7 @@ Toolbar toolbar;
                      case((int)Properties.SecondaryAlbedoTexture):ReadIndex = -4;break;
                      case((int)Properties.SecondaryAlbedoTextureMask):ReadIndex = ChannelProperties.IndexOf(CurrentNode.GUID);break;
                      case((int)Properties.SecondaryNormalTexture):ReadIndex = -3;break;
+                     case((int)Properties.DisplacementTexture):ReadIndex = ChannelProperties.IndexOf(CurrentNode.GUID);break;
                   }
                   FallbackNodes.Add(new TexturePairs() {
                      Purpose = Purpose,
@@ -970,6 +973,7 @@ Toolbar toolbar;
                         case((int)Properties.SecondaryAlbedoTexture):ReadIndex = -4;break;
                         case((int)Properties.SecondaryAlbedoTextureMask):ReadIndex = ChannelProperties.IndexOf(CurrentNode.GUID);break;
                         case((int)Properties.SecondaryNormalTexture):ReadIndex = -3;break;
+                        case((int)Properties.DisplacementTexture):ReadIndex = ChannelProperties.IndexOf(CurrentNode.GUID);break;
                      }
                      FallbackNodes.Add(new TexturePairs() {
                         Purpose = Purpose,
@@ -1088,6 +1092,14 @@ Toolbar toolbar;
                   MatShader.AvailableTextures.Add(new TexturePairs() {
                      Purpose = (int)TexturePurpose.SecondaryNormalTexture,
                      ReadIndex = -3,
+                     TextureName = TextureProperties[VerboseTextureProperties.IndexOf(AvailableIndexes[i].title)],
+                     Fallback = FallbackNode
+                  });  
+               break;
+               case((int)Properties.DisplacementTexture):
+                  MatShader.AvailableTextures.Add(new TexturePairs() {
+                     Purpose = (int)TexturePurpose.Displacement,
+                     ReadIndex = ChannelProperties.IndexOf(AvailableIndexes[i].GUID),
                      TextureName = TextureProperties[VerboseTextureProperties.IndexOf(AvailableIndexes[i].title)],
                      Fallback = FallbackNode
                   });  
@@ -1321,6 +1333,7 @@ Toolbar toolbar;
          OutputNode.inputContainer.Add(_graphView.GeneratePort(OutputNode, Direction.Input, typeof(Texture), Port.Capacity.Single, "Secondary Base Texture"));
          OutputNode.inputContainer.Add(_graphView.GeneratePort(OutputNode, Direction.Input, typeof(Texture), Port.Capacity.Single, "Secondary Base Texture Mask(Single Component)"));
          OutputNode.inputContainer.Add(_graphView.GeneratePort(OutputNode, Direction.Input, typeof(Texture), Port.Capacity.Single, "Detail Normal Texture"));
+         OutputNode.inputContainer.Add(_graphView.GeneratePort(OutputNode, Direction.Input, typeof(Texture), Port.Capacity.Single, "Displacement Texture(Single Component)"));
 
          _graphView.AddElement(OutputNode);
          Vector2 Pos = new Vector2(30, 10);
@@ -1334,6 +1347,11 @@ Toolbar toolbar;
             Edge ThisEdge = new Edge();
             TexturePairs CurrentPair = MatShader.AvailableTextures[i];
             switch((int)CurrentPair.Purpose) {
+               case((int)TexturePurpose.Displacement):
+                  Pos.y = 1460;
+                  ThisNode = CreateInputNode("Texture", typeof(Texture), Pos, CurrentPair.TextureName, CurrentPair.ReadIndex);
+                  ThisEdge = (ThisNode.outputContainer[0] as Port).ConnectTo(OutputNode.inputContainer[(int)Properties.DisplacementTexture] as Port);
+               break;
                case((int)TexturePurpose.SecondaryNormalTexture):
                   Pos.y = 1380;
                   ThisNode = CreateInputNode("Texture", typeof(Texture), Pos, CurrentPair.TextureName);
@@ -1398,6 +1416,10 @@ Toolbar toolbar;
                   CurrentPair = CurrentPair.Fallback;
                   Pos.x -= 600;
                   switch((int)CurrentPair.Purpose) {
+                     case((int)TexturePurpose.Displacement):
+                        Pos.y = 1460;
+                        ThisNode = CreateInputNode("Texture", typeof(Texture), Pos, CurrentPair.TextureName, CurrentPair.ReadIndex);
+                     break;
                      case((int)TexturePurpose.SecondaryNormalTexture):
                         Pos.y = 1380;
                         ThisNode = CreateInputNode("Texture", typeof(Texture), Pos, CurrentPair.TextureName);
@@ -3024,6 +3046,8 @@ Slider AperatureSlider;
                                        TempRTO.AlbedoBlendFactor[NameIndex] = Ray.AlbedoBlendFactor;
                                        TempRTO.SecondaryNormalTexScaleOffset[NameIndex] = Ray.SecondaryNormalTexScaleOffset;
                                        TempRTO.SecondaryNormalTexBlend[NameIndex] = Ray.SecondaryNormalTexBlend;
+                                       TempRTO.DisplacementTexScaleOffset[NameIndex] = Ray.DisplacementTexScaleOffset;
+                                       TempRTO.RotationDisplacement[NameIndex] = Ray.RotationDisplacement;
                                        TempRTO.CallMaterialEdited();
                                     }
                                  }

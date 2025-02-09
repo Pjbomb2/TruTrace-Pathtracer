@@ -193,6 +193,7 @@ inline TriangleUvs triangle_get_positions2(const int ID) {
 }
 
 SamplerState my_linear_clamp_sampler;
+SamplerState my_linear_repeat_sampler;
 SamplerState sampler_trilinear_clamp;
 SamplerState my_point_clamp_sampler;
 
@@ -302,6 +303,9 @@ inline float4 SampleTexture(float2 UV, int TextureType, const MaterialData MatTe
 			case SampleDetailNormal:
 				FinalCol = _NormalAtlas.SampleLevel(sampler_NormalAtlas, AlignUV(UV, MatTex.SecondaryNormalTexScaleOffset, MatTex.SecondaryNormalTex, MatTex.RotationSecondaryNormal), 0).xyxy;
 			break;
+			case SampleDisplacement:
+				FinalCol = SingleComponentAtlas.SampleLevel(my_linear_repeat_sampler, AlignUV(UV, MatTex.DisplacementTexScaleOffset, MatTex.DisplacementTex, MatTex.RotationDisplacement), 0);
+			break;
 		}
 	#else//BINDLESS
 		//AlbedoTexScale, AlbedoTex, and Rotation dont worry about, thats just for transforming to the atlas 
@@ -319,6 +323,7 @@ inline float4 SampleTexture(float2 UV, int TextureType, const MaterialData MatTe
 			case SampleSecondaryAlbedo: TextureIndexAndChannel = MatTex.SecondaryAlbedoTex; HandleRotation(UV, MatTex.RotationSecondaryDiffuse);  UV = UV * MatTex.SecondaryAlbedoTexScaleOffset.xy + MatTex.SecondaryAlbedoTexScaleOffset.zw; break;
 			case SampleSecondaryAlbedoMask: TextureIndexAndChannel = MatTex.SecondaryAlbedoMask; HandleRotation(UV, MatTex.Rotation); UV = UV * MatTex.AlbedoTexScale.xy + MatTex.AlbedoTexScale.zw; break;
 			case SampleDetailNormal: TextureIndexAndChannel = MatTex.SecondaryNormalTex; HandleRotation(UV, MatTex.RotationSecondaryNormal); UV = UV * MatTex.SecondaryNormalTexScaleOffset.xy + MatTex.SecondaryNormalTexScaleOffset.zw; break;
+			case SampleDisplacement: TextureIndexAndChannel = MatTex.DisplacementTex; HandleRotation(UV, MatTex.RotationDisplacement); UV = UV * MatTex.DisplacementTexScaleOffset.xy + MatTex.DisplacementTexScaleOffset.zw; break;
 		}
 		int TextureIndex = TextureIndexAndChannel.x - 1;
 		int TextureReadChannel = TextureIndexAndChannel.y;//0-3 is rgba, 4 is to just read all
@@ -1854,7 +1859,360 @@ int SampleLightBVH(float3 p, float3 n, inout float pmf, const int pixel_index, i
 	}
 	return -1;
 }
+uint BitFieldInsert(uint mask, uint src, uint dst)
+{
+    return (src & mask) | (dst & ~mask);
+}
 
+float CopySign(float x, float s, bool ignoreNegZero = true)
+{
+	return abs(x) * (s >= 0 ? 1.0f : -1.0f);
+
+    if (ignoreNegZero)
+    {
+        return (s >= 0) ? abs(x) : -abs(x);
+    }
+    else
+    {
+        uint negZero = 0x80000000u;
+        uint signBit = negZero & asuint(s);
+        return asfloat(BitFieldInsert(negZero, signBit, asuint(x)));
+    }
+}
+
+
+void intersectPatch(float3 q00, float3 q10, float3 q11, float3 q01, SmallerRay ray, inout float2 MinMax, float max_distance) {
+	// ray is rtDeclareVariable(Ray, ray, rtCurrentRay,) in OptiX
+	// patchdata is optix::rtBuffer
+	// 4 corners + "normal" qn
+	float3 e10 = q10 - q00; // q01 ----------- q11
+	float3 e11 = q11 - q10; // ||
+	float3 e00 = q01 - q00; // | e00e11 | we precompute
+	float3 qn = (cross(q10-q00,q01-q11));// |e10| qn = cross(q10-q00,
+	q00 -= ray.origin;// q00 ----------- q10 q01-q11)
+	q10 -= ray.origin;
+	float a = dot(cross(q00, ray.direction), e00); // the equation is
+	float c = dot(qn, ray.direction);// a + b u + c u^2
+	float b = dot(cross(q10, ray.direction), e11); //
+	b -= a + c;// a+b+c and then b
+	float det = b*b - 4*a*c;
+	if (det < 0) return;// see the right part of Figure 5
+	det = sqrt(det);// we -use_fast_math in CUDA_NVRTC_OPTIONS
+	float u1, u2;// two roots(u parameter)
+	float t = FarPlane, u, v; // need solution for the smallest t > 0
+	if (c == 0) {// if c == 0, it is a trapezoid
+	u1 = -a/b; u2 = -1;// and there is only one root
+	} else {// (c != 0 in Stanford models)
+	u1 = (-b - CopySign(det, b))/2;// numerically "stable" root
+	u2 = a/u1;// Viete's formula for u1*u2
+	u1 /= c;
+	}
+	if (0 <= u1 && u1 <= 1) {// is it inside the patch?
+	float3 pa = lerp(q00, q10, u1);// point on edge e10 (Fig. 4)
+	float3 pb = lerp(e00, e11, u1);// it is, actually, pb - pa
+	float3 n = cross(ray.direction, pb);
+	det = dot(n, n);
+	n = cross(n, pa);
+	float t1 = dot(n, pb);
+	float v1 = dot(n, ray.direction);// no need to check t1 < t
+	if (t1 > 0 && 0 <= v1 && v1 <= det) {// if t1 > ray.tmax,
+	t = t1/det; u = u1; v = v1/det;// it will be rejected
+	}// in rtPotentialIntersection
+	}
+	if (0 <= u2 && u2 <= 1) {// it is slightly different,
+	float3 pa = lerp(q00, q10, u2);// since u1 might be good
+	float3 pb = lerp(e00, e11, u2);// and we need 0 < t2 < t1
+	float3 n = cross(ray.direction, pb);
+	det = dot(n, n);
+	n = cross(n, pa);
+	float t2 = dot(n, pb)/det;
+	float v2 = dot(n, ray.direction);
+	if (0 <= v2 && v2 <= det && t > t2 && t2 > 0) {
+	t = t2; u = u2; v = v2/det;
+	}
+	}
+	// Fill the intersection structure irec.
+	// Normal(s) for the closest hit will be normalized in a shader.
+	float3 du = lerp(e10, q11 - q01, v);
+	float3 dv = lerp(e00, e11, u);
+	float3 gn = cross(du, dv);
+	if(t < FarPlane) {
+		if(dot(gn, ray.direction) >= 0) 
+		MinMax.y = max(t, MinMax.y);
+		if(dot(gn, ray.direction) < 0) 
+		MinMax.x = min(t, MinMax.x);
+	}
+
+}
+
+inline bool IntersectPrismTriangle2(float3 pos0, float3 v1, float3 v2, SmallerRay ray) {
+	float3 posedge1 = v1 - pos0;
+	float3 posedge2 = v2 - pos0;
+
+    float3 h = cross(ray.direction, posedge2);
+    float  a = dot(posedge1, h);
+
+    float  f = rcp(a);
+    float3 s = ray.origin - pos0;
+    float  u = f * dot(s, h);
+
+    // if (u >= 0.0f && u <= 1.0f) {
+    //     float3 q = cross(s, posedge1);
+    //     float  v = f * dot(ray.direction, q);
+
+    //     if (v >= 0.0f && u + v <= 1.0f) {
+    //         float t = f * dot(posedge2, q);
+
+    //         if (t > 0 && t < FarPlane) {
+                if(dot(normalize(cross(normalize(posedge1), normalize(posedge2))), ray.direction) <= 0) return false;
+
+
+    //         }
+    //     }
+    // }
+    return true;
+}
+
+inline void IntersectPrismTriangle(float3 pos0, float3 v1, float3 v2, SmallerRay ray, inout float2 MinMax, float max_distance) {
+	float3 posedge1 = v1 - pos0;
+	float3 posedge2 = v2 - pos0;
+
+    float3 h = cross(ray.direction, posedge2);
+    float  a = dot(posedge1, h);
+
+    float  f = rcp(a);
+    float3 s = ray.origin - pos0;
+    float  u = f * dot(s, h);
+
+    if (u >= 0.0f && u <= 1.0f) {
+        float3 q = cross(s, posedge1);
+        float  v = f * dot(ray.direction, q);
+
+        if (v >= 0.0f && u + v <= 1.0f) {
+            float t = f * dot(posedge2, q);
+
+            if (t > 0 && t < FarPlane) {
+				float3 gn = normalize(cross(normalize(posedge1), normalize(posedge2)));
+
+				if(dot(gn, ray.direction) >= 0) 
+				MinMax.y = max(t, MinMax.y);
+				if(dot(gn, ray.direction) < 0) 
+				MinMax.x = min(t, MinMax.x);
+
+ 				// MinMax.x = min(MinMax.x, t);
+ 				// MinMax.y = max(MinMax.y, t);
+            }
+        }
+    }
+}
+Texture2D<float4> DisplacementTexture;
+
+float3 triangleBarycentric (float3 s,
+float3 c0, float3 c1, float3 c2)
+{
+float3 x0, x1, x2, b;
+float d00, d01, d11, d20, d21, invDenom;
+x0 = c1-c0; x1 = c2-c0; x2 = s - c0;
+d00 = dot(x0, x0);
+d01 = dot(x0, x1);
+d11 = dot(x1, x1);
+d20 = dot(x2, x0);
+d21 = dot(x2, x1);
+invDenom = 1.0 / (d00 * d11 - d01 * d01);
+b.y = (d11 * d20 - d01 * d21) * invDenom;
+b.z = (d00 * d21 - d01 * d20) * invDenom;
+b.x = 1.0-b.y-b.z;
+return b;
+}
+
+bool IntersectPrism(Prism prism, SmallerRay ray, CudaTriangleA TriUVs, CudaTriangleB TriNorms, int mesh_id,  int tri_id, inout RayHit ray_hit, int pixel_index, inout float3 RunningNorm, int MatOffset, inout int Rep3) {
+	float2 MinMax = float2(ray_hit.t, 0);
+	intersectPatch(prism.v1, prism.v0, prism.e0, prism.e1, ray, MinMax, ray_hit.t);
+	intersectPatch(prism.v0, prism.v2, prism.e2, prism.e0, ray, MinMax, ray_hit.t);
+	intersectPatch(prism.v2, prism.v1, prism.e1, prism.e2, ray, MinMax, ray_hit.t);
+	IntersectPrismTriangle(prism.v0, prism.v1, prism.v2, ray, MinMax, ray_hit.t);
+	IntersectPrismTriangle(prism.e2, prism.e1, prism.e0, ray, MinMax, ray_hit.t);
+	
+	if(!IntersectPrismTriangle2(prism.v0, prism.v1, prism.v2, ray)) return false;
+
+
+	float dt = 0.0055f;
+	float YY = MinMax.y;
+	if(MinMax.x != FarPlane && MinMax.y != 0) YY = min(YY, ray_hit.t);
+	if(MinMax.x == ray_hit.t && MinMax.y != 0) MinMax.x = 0;
+	MinMax.y = YY;
+	if(MinMax.y > MinMax.x && MinMax.y <= ray_hit.t) {
+	// ray_hit.t = MinMax.y;
+	// return false;
+		if(ray_hit.t < MinMax.x) return false;
+		float t = MinMax.x;
+		float3 s = ray.origin + ray.direction * MinMax.x;
+		float3 ns;
+		float3 n;
+		float hray;
+		{
+			float3 AB = prism.v1 - prism.v0;
+			float3 AC = prism.v2 - prism.v0;
+			n = normalize(cross(normalize(AB), normalize(AC)));
+			float3 v = prism.v0 - s;
+
+
+			ns = normalize(cross(normalize(AB), normalize(AC)));
+			hray = (dot(v, n));
+			if(dot(v, n) < 0) {
+				ns *= -1.0f;
+				n *= -1.0f;
+			}
+			hray = abs(hray);
+		}
+		float3 c0 = prism.v0 + (prism.e0 - prism.v0) * hray;
+		float3 c1 = prism.v1 + (prism.e1 - prism.v1) * hray;
+		float3 c2 = prism.v2 + (prism.e2 - prism.v2) * hray;
+
+		float3 n0 = i_octahedral_32(TriNorms.norms.x);
+		float3 n1 = i_octahedral_32(TriNorms.norms.y);
+		float3 n2 = i_octahedral_32(TriNorms.norms.z);
+
+		float Divisor = 20.0f;
+    	int MaterialIndex = (MatOffset + TriUVs.MatDat);
+    	MaterialData Mat = _Materials[MaterialIndex];
+
+		float hsurf = 0;
+		float3 b;
+		int CurStep = 0;
+		while(hray > hsurf && t < MinMax.y && CurStep < 100) {
+			CurStep++;
+			float H = (dot(ns, (c0 - s)));
+			c0 = c0 - n0 * H;
+			c1 = c1 - n1 * H;
+			c2 = c2 - n2 * H;
+
+			b = triangleBarycentric(s, c0, c1, c2);
+			float3 p = prism.v0 * b.x + prism.v1 * b.y + prism.v2 * b.z;
+			hray = dot(s - p, s - p);
+			float2 uv = TOHALF(TriUVs.tex0) * b.x + TOHALF(TriUVs.texedge1) * b.y + TOHALF(TriUVs.texedge2) * b.z;
+			hsurf = clamp((SampleTexture(uv * 1.0f, SampleDisplacement, Mat))/Divisor+0.01f, 0.00f, 0.04f);
+			hsurf *= hsurf;
+			// dt += 0.00001f;
+			t = t + dt;
+			s = s + ray.direction * dt;
+			ns = n0 * b.x + n1 * b.y + n2 * b.z;
+		}
+		Rep3 += CurStep;
+		if(hray < hsurf && ray_hit.t > t) {
+			// MinMax = float2(t, t);
+			// IntersectPrismTriangle2(c0, c1, c2, ray, MinMax, ray_hit);
+			// t = MinMax.y - 2.0f * dt;
+			float3 phit = ray.origin + ray.direction * t;
+			b = triangleBarycentric(phit, c0, c1, c2);
+			float3 N = n0 * b.x + n1 * b.y + n2 * b.z;
+			float FinDiff = 0.0001f;
+			float2 uva = TOHALF(TriUVs.tex0) * b.x + TOHALF(TriUVs.texedge1) * b.y + TOHALF(TriUVs.texedge2) * b.z;
+			float2 uvb = TOHALF(TriUVs.tex0) * (b.x+FinDiff) + TOHALF(TriUVs.texedge1) * b.y + TOHALF(TriUVs.texedge2) * (b.z-FinDiff);
+			float2 uvc = TOHALF(TriUVs.tex0) * b.x + TOHALF(TriUVs.texedge1) * (b.y+FinDiff) + TOHALF(TriUVs.texedge2) * (b.z-FinDiff);
+
+			float3 pa = prism.v0 * b.x + prism.v1 * b.y + prism.v2 * b.z;
+			float3 pb = prism.v0 * (b.x+FinDiff) + prism.v1 * b.y + prism.v2 * (b.z-FinDiff);
+			float3 pc = prism.v0 * b.x + prism.v1 * (b.y+FinDiff) + prism.v2 * (b.z-FinDiff);
+			
+
+			float3 sa = pa + N * clamp((SampleTexture(uva * 1.0f, SampleDisplacement, Mat))/Divisor+0.01f, 0.00f, 0.04f);
+			float3 sb = pb + N * clamp((SampleTexture(uvb * 1.0f, SampleDisplacement, Mat))/Divisor+0.01f, 0.00f, 0.04f);
+			float3 sc = pc + N * clamp((SampleTexture(uvc * 1.0f, SampleDisplacement, Mat))/Divisor+0.01f, 0.00f, 0.04f);
+
+			float3 Ns = (cross((sc - sa), (sb - sa)))/FinDiff;
+
+			RunningNorm = normalize(Ns);
+
+
+            ray_hit.t = t;//- 2.0f * dt;
+            ray_hit.u = uva.x;
+            ray_hit.v = uva.y;
+            ray_hit.mesh_id = mesh_id;
+            ray_hit.triangle_id = tri_id;
+			return true;
+		}
+
+	}
+	return false;
+}
+
+
+bool IntersectPrismShadow(Prism prism, SmallerRay ray, CudaTriangleA TriUVs, CudaTriangleB TriNorms, int mesh_id,  int tri_id, float max_distance, int MatOffset) {
+	float2 MinMax = float2(max_distance, 0);
+	intersectPatch(prism.v1, prism.v0, prism.e0, prism.e1, ray, MinMax, max_distance);
+	intersectPatch(prism.v0, prism.v2, prism.e2, prism.e0, ray, MinMax, max_distance);
+	intersectPatch(prism.v2, prism.v1, prism.e1, prism.e2, ray, MinMax, max_distance);
+	IntersectPrismTriangle(prism.v0, prism.v1, prism.v2, ray, MinMax, max_distance);
+	IntersectPrismTriangle(prism.e2, prism.e1, prism.e0, ray, MinMax, max_distance);
+
+	if(!IntersectPrismTriangle2(prism.v0, prism.v1, prism.v2, ray)) return false;
+
+
+	float dt = 0.0055f;
+	float YY = MinMax.y;
+	if(MinMax.x != FarPlane && MinMax.y != 0) YY = min(YY, max_distance);
+	if(MinMax.x == max_distance && MinMax.y != 0) MinMax.x = 0;
+	MinMax.y = YY;
+	if(MinMax.y > MinMax.x && MinMax.y <= max_distance) {
+	// ray_hit.t = MinMax.y;
+	// return false;
+		if(max_distance < MinMax.x) return false;
+		float t = MinMax.x;
+		float3 s = ray.origin + ray.direction * MinMax.x;
+		float3 ns;
+		float3 n;
+		float hray;
+		{
+			float3 AB = prism.v1 - prism.v0;
+			float3 AC = prism.v2 - prism.v0;
+			n = normalize(cross(normalize(AB), normalize(AC)));
+			float3 v = prism.v0 - s;
+			hray = abs(dot(v, n));
+
+
+			ns = normalize(cross(normalize(AB), normalize(AC)));
+		}
+		float3 c0 = prism.v0 + (prism.e0 - prism.v0) * hray;
+		float3 c1 = prism.v1 + (prism.e1 - prism.v1) * hray;
+		float3 c2 = prism.v2 + (prism.e2 - prism.v2) * hray;
+
+		float3 n0 = i_octahedral_32(TriNorms.norms.x);
+		float3 n1 = i_octahedral_32(TriNorms.norms.y);
+		float3 n2 = i_octahedral_32(TriNorms.norms.z);
+
+		float Divisor = 20.0f;
+    	int MaterialIndex = (MatOffset + TriUVs.MatDat);
+    	MaterialData Mat = _Materials[MaterialIndex];
+
+		float hsurf = 0;
+		float3 b;
+		int CurStep = 0;
+		while(hray > hsurf && t < MinMax.y && CurStep < 100) {
+			CurStep++;
+			float H = (dot(ns, (c0 - s)));
+			c0 = c0 - n0 * H;
+			c1 = c1 - n1 * H;
+			c2 = c2 - n2 * H;
+
+			b = triangleBarycentric(s, c0, c1, c2);
+			float3 p = prism.v0 * b.x + prism.v1 * b.y + prism.v2 * b.z;
+			hray = dot(s - p, s - p);
+			float2 uv = TOHALF(TriUVs.tex0) * b.x + TOHALF(TriUVs.texedge1) * b.y + TOHALF(TriUVs.texedge2) * b.z;
+			hsurf = clamp((SampleTexture(uv * 1.0f, SampleDisplacement, Mat))/Divisor+0.01f, 0.00f, 0.04f);
+			hsurf *= hsurf;
+			// dt += 0.00001f;
+			t = t + dt;
+			s = s + ray.direction * dt;
+			ns = n0 * b.x + n1 * b.y + n2 * b.z;
+		}
+		if(hray < hsurf && max_distance > t) {
+			return true;
+		}
+
+	}
+	return false;
+}
 
 float3 LoadSurfaceInfoPrev(int2 id) {
     uint4 Target = PrimaryTriDataPrev[id.xy];

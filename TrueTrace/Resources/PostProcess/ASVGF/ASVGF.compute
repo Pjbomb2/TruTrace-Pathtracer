@@ -399,7 +399,7 @@ void Reproject(uint3 gl_GlobalInvocationID : SV_DispatchThreadID, uint3 gl_WorkG
 		RNGTexA[ipos] = float4(CurFrame, ipos.x + ipos.y * screen_width, 0, 0);
 	    const uint pixel_index = ipos.x + ipos.y * screen_width;
 	    Ray CamRay = CreateCameraRay(ipos / float2(screen_width, screen_height) * 2.0f - 1.0f);
-	    RayData globray = {CamRay.origin + NearPlane * CamRay.direction, pixel_index, CamRay.direction, 0, 0,0,asuint(FarPlane),0};
+	    RayData globray = {CamRay.origin + NearPlane * CamRay.direction, pixel_index, CamRay.direction, 0, 0,0,asuint(FarPlane),0,0};
 	    GlobalRaysMini[pixel_index] = globray;
 	}
 	GroupMemoryBarrierWithGroupSync();

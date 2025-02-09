@@ -95,6 +95,7 @@
 #define SampleSecondaryAlbedo 10
 #define SampleSecondaryAlbedoMask 11
 #define SampleDetailNormal 12
+#define SampleDisplacement 13
 
 #define BlendModeLerp 0
 #define BlendModeAdd 1

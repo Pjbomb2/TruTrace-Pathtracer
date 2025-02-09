@@ -194,6 +194,8 @@ namespace TrueTrace {
                     MainTexScaleOffset = ThisOBJ.MainTexScaleOffset[SaveIndex],
                     SecondaryAlbedoTexScaleOffset = ThisOBJ.SecondaryAlbedoTexScaleOffset[SaveIndex],
                     SecondaryNormalTexScaleOffset = ThisOBJ.SecondaryNormalTexScaleOffset[SaveIndex],
+                    DisplacementTexScaleOffset = ThisOBJ.DisplacementTexScaleOffset[SaveIndex],
+                    RotationDisplacement = ThisOBJ.RotationDisplacement[SaveIndex],
                     SecondaryTextureScaleOffset = ThisOBJ.SecondaryTextureScaleOffset[SaveIndex],
                     NormalTexScaleOffset = ThisOBJ.NormalTexScaleOffset[SaveIndex],
                     RotationNormal = ThisOBJ.RotationNormal[SaveIndex],
@@ -359,6 +361,8 @@ namespace TrueTrace {
             t.BlendFactor[Selected] = RayObj.BlendFactor;
             t.MainTexScaleOffset[Selected] = RayObj.MainTexScaleOffset;
             t.SecondaryAlbedoTexScaleOffset[Selected] = RayObj.SecondaryAlbedoTexScaleOffset;
+            t.DisplacementTexScaleOffset[Selected] = RayObj.DisplacementTexScaleOffset;
+            t.RotationDisplacement[Selected] = RayObj.RotationDisplacement;
             t.SecondaryNormalTexScaleOffset[Selected] = RayObj.SecondaryNormalTexScaleOffset;
             t.SecondaryTextureScaleOffset[Selected] = RayObj.SecondaryTextureScaleOffset;
             t.NormalTexScaleOffset[Selected] = RayObj.NormalTexScaleOffset;
@@ -609,6 +613,8 @@ namespace TrueTrace {
                     BlendFactor = ThisOBJ.BlendFactor[SaveIndex],
                     MainTexScaleOffset = ThisOBJ.MainTexScaleOffset[SaveIndex],
                     SecondaryAlbedoTexScaleOffset = ThisOBJ.SecondaryAlbedoTexScaleOffset[SaveIndex],
+                    DisplacementTexScaleOffset = ThisOBJ.DisplacementTexScaleOffset[SaveIndex],
+                    RotationDisplacement = ThisOBJ.RotationDisplacement[SaveIndex],
                     SecondaryNormalTexScaleOffset = ThisOBJ.SecondaryNormalTexScaleOffset[SaveIndex],
                     SecondaryTextureScaleOffset = ThisOBJ.SecondaryTextureScaleOffset[SaveIndex],
                     NormalTexScaleOffset = ThisOBJ.NormalTexScaleOffset[SaveIndex],
@@ -913,6 +919,14 @@ namespace TrueTrace {
                             EditorGUILayout.EndVertical();
 
 
+                            EditorGUILayout.Space();
+                            EditorGUILayout.Space();
+                            EditorGUILayout.BeginVertical();
+                                GUILayout.Label("Displacement Map", LabelStyleBolded);
+                                serializedObject.FindProperty("DisplacementTexScaleOffset").GetArrayElementAtIndex(Selected).vector4Value = EditorGUILayout.Vector4Field("Scale/Offset: ", t.DisplacementTexScaleOffset[Selected]);
+                                serializedObject.FindProperty("RotationDisplacement").GetArrayElementAtIndex(Selected).floatValue = EditorGUILayout.Slider("Rotation: ", t.RotationDisplacement[Selected], 0, 360);
+                            EditorGUILayout.EndVertical();
+
 
 
 
@@ -1146,6 +1160,8 @@ namespace TrueTrace {
                             t.BlendFactor[i] = t.BlendFactor[Selected];
                             t.MainTexScaleOffset[i] = t.MainTexScaleOffset[Selected];
                             t.SecondaryAlbedoTexScaleOffset[i] = t.SecondaryAlbedoTexScaleOffset[Selected];
+                            t.DisplacementTexScaleOffset[i] = t.DisplacementTexScaleOffset[Selected];
+                            t.RotationDisplacement[i] = t.RotationDisplacement[Selected];
                             t.SecondaryNormalTexScaleOffset[i] = t.SecondaryNormalTexScaleOffset[Selected];
                             t.SecondaryTextureScaleOffset[i] = t.SecondaryTextureScaleOffset[Selected];
                             t.NormalTexScaleOffset[i] = t.NormalTexScaleOffset[Selected];
@@ -1205,6 +1221,8 @@ namespace TrueTrace {
                                 Obj.BlendFactor[i] = t.BlendFactor[Selected];
                                 Obj.MainTexScaleOffset[i] = t.MainTexScaleOffset[Selected];
                                 Obj.SecondaryAlbedoTexScaleOffset[i] = t.SecondaryAlbedoTexScaleOffset[Selected];
+                                Obj.DisplacementTexScaleOffset[i] = t.DisplacementTexScaleOffset[Selected];
+                                Obj.RotationDisplacement[i] = t.RotationDisplacement[Selected];
                                 Obj.SecondaryNormalTexScaleOffset[i] = t.SecondaryNormalTexScaleOffset[Selected];
                                 Obj.SecondaryTextureScaleOffset[i] = t.SecondaryTextureScaleOffset[Selected];
                                 Obj.NormalTexScaleOffset[i] = t.NormalTexScaleOffset[Selected];

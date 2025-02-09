@@ -70,6 +70,7 @@ namespace TrueTrace {
 
                     float cost = SAH[i] + surface_area(ref aabb_right) * (float)(index_count - i);
 
+                    // Debug.Log(surface_area(ref aabb_right));
                     if(cost <= split.cost) {
                         split.cost = cost;
                         split.index = first_index + i;

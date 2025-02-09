@@ -29,6 +29,9 @@ struct CudaTriangle {
 RWStructuredBuffer<CudaTriangleA> OutCudaTriArrayA;
 RWStructuredBuffer<CudaTriangleB> OutCudaTriArrayB;
 
+RWStructuredBuffer<Prism> OutPrismArray;
+StructuredBuffer<Prism> InPrismArray;
+
 StructuredBuffer<CudaTriangle> InCudaTriArray;
 
 uint Offset;
@@ -54,6 +57,8 @@ void CombineTriBuffers(uint3 id : SV_DispatchThreadID)
 	OutCudaTriArrayB[id.x + Offset].VertColB = InCudaTriArray[id.x].VertColB;
 	OutCudaTriArrayB[id.x + Offset].VertColC = InCudaTriArray[id.x].VertColC;
 	OutCudaTriArrayB[id.x + Offset].IsEmissive = InCudaTriArray[id.x].IsEmissive;
+	
+	OutPrismArray[id.x + Offset] = InPrismArray[id.x];
 
 }
 

@@ -56,6 +56,8 @@ namespace TrueTrace {
 		[SerializeField] public float[] SecondaryNormalTexBlend;
 		[SerializeField] public float[] DetailNormalStrength;
 		[SerializeField] public Vector4[] SecondaryNormalTexScaleOffset;
+		[SerializeField] public Vector4[] DisplacementTexScaleOffset;
+		[SerializeField] public float[] RotationDisplacement;
 		public int[] Indexes;
 		public bool NeedsToUpdate;
 		[SerializeField] public bool IsReady = false;
@@ -232,6 +234,7 @@ namespace TrueTrace {
 			InitializeArray<float>(ref RotationSecondary, 0, Index, NeedsRedo);
 			InitializeArray<float>(ref RotationSecondaryDiffuse, 0, Index, NeedsRedo);
 			InitializeArray<float>(ref RotationSecondaryNormal, 0, Index, NeedsRedo);
+			InitializeArray<float>(ref RotationDisplacement, 0, Index, NeedsRedo);
 			InitializeArray<int>(ref Flags, 0, Index, NeedsRedo);
 
 			InitializeArray<Vector4>(ref SecondaryTextureScaleOffset, new Vector4(1,1,0,0), Index, NeedsRedo);
@@ -239,6 +242,7 @@ namespace TrueTrace {
 			InitializeArray<Vector4>(ref MainTexScaleOffset, new Vector4(1,1,0,0), Index, NeedsRedo);
 			InitializeArray<Vector4>(ref SecondaryAlbedoTexScaleOffset, new Vector4(1,1,0,0), Index, NeedsRedo);
 			InitializeArray<Vector4>(ref SecondaryNormalTexScaleOffset, new Vector4(1,1,0,0), Index, NeedsRedo);
+			InitializeArray<Vector4>(ref DisplacementTexScaleOffset, new Vector4(1,1,0,0), Index, NeedsRedo);
 			InitializeArray<Vector3>(ref BlendColor, new Vector3(1,1,1), Index, NeedsRedo);
 			InitializeArray<float>(ref BlendFactor, 0, Index, NeedsRedo);
 			InitializeArray<float>(ref Hue, 0, Index, NeedsRedo);

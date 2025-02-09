@@ -13,7 +13,7 @@ void GenKernel (uint3 id : SV_DispatchThreadID)
     const uint pixel_index = ScreenPosition.y * screen_width + ScreenPosition.x;
     float2 uv = float2(ScreenPosition.xy / float2(screen_width, screen_height) * 2.0f - 1.0f);
     SmallerRay ray = CreateCameraRay(uv);
-    RayData globray = {ray.origin + NearPlane * ray.direction, pixel_index, ray.direction, 0, 0,0,asuint(FarPlane),0};
+    RayData globray = {ray.origin + NearPlane * ray.direction, pixel_index, ray.direction, 0, 0,0,asuint(FarPlane),0,0};
     GlobalRays[0] = globray;
 
 }

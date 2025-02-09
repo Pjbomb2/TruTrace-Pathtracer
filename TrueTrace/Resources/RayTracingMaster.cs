@@ -110,6 +110,7 @@ namespace TrueTrace {
 
         // public RenderTexture TTMotionVectors;
 
+
         private RenderTexture GIReservoirA;
         private RenderTexture GIReservoirB;
         private RenderTexture GIReservoirC;
@@ -522,7 +523,7 @@ namespace TrueTrace {
             if(CurBounceInfoBuffer != null) CurBounceInfoBuffer.ReleaseSafe();
             CurBounceInfoBuffer = new ComputeBuffer(1, 12);
             if(_RayBuffer == null || _RayBuffer.count != SourceWidth * SourceHeight) {
-                CommonFunctions.CreateDynamicBuffer(ref _RayBuffer, SourceWidth * SourceHeight * 2, 48);
+                CommonFunctions.CreateDynamicBuffer(ref _RayBuffer, SourceWidth * SourceHeight * 2, 52);
                 CommonFunctions.CreateDynamicBuffer(ref _ShadowBuffer, SourceWidth * SourceHeight, 48);
                 CommonFunctions.CreateDynamicBuffer(ref LightingBuffer, SourceWidth * SourceHeight, 64);
             }
@@ -1154,6 +1155,7 @@ namespace TrueTrace {
                             #if HardwareRT
                                 cmd.DispatchCompute(IntersectionShader, TraceKernel, CurBounceInfoBuffer, 0);//784 is 28^2
                             #else
+                                // cmd.DispatchCompute(IntersectionShader, TraceKernel, CurBounceInfoBuffer, 0);//784 is 28^2
                                 cmd.DispatchCompute(IntersectionShader, TraceKernel, 32, 32, 1);
                             #endif
                         #endif

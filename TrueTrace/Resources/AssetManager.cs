@@ -52,6 +52,7 @@ namespace TrueTrace {
         [HideInInspector] public MaterialData[] _Materials;
         [HideInInspector] public ComputeBuffer BVH8AggregatedBuffer;
         [HideInInspector] public ComputeBuffer AggTriBufferA;
+        [HideInInspector] public ComputeBuffer PrismBuffer;
         [HideInInspector] public ComputeBuffer AggTriBufferB;
         [HideInInspector] public ComputeBuffer LightTriBuffer;
         [HideInInspector] public ComputeBuffer LightTreeBufferA;
@@ -83,6 +84,7 @@ namespace TrueTrace {
                 ThisShader.SetComputeBuffer(Kernel, "TLASBVH8Indices", TLASCWBVHIndexes);
             #endif
             ThisShader.SetComputeBuffer(Kernel, "AggTrisA", AggTriBufferA);
+            ThisShader.SetComputeBuffer(Kernel, "PrismBuffer", PrismBuffer);
             ThisShader.SetComputeBuffer(Kernel, "AggTrisB", AggTriBufferB);
             ThisShader.SetComputeBuffer(Kernel, "cwbvh_nodes", BVH8AggregatedBuffer);
             ThisShader.SetComputeBuffer(Kernel, "_MeshData", (RayMaster.LocalTTSettings.DoTLASUpdates && (RayMaster.FramesSinceStart2 % 2 == 0)) ? MeshDataBufferA : MeshDataBufferB);
@@ -206,6 +208,7 @@ namespace TrueTrace {
             LightTreeBufferB.ReleaseSafe();
             BVH8AggregatedBuffer.ReleaseSafe();
             AggTriBufferA.ReleaseSafe();
+            PrismBuffer.ReleaseSafe();
             AggTriBufferB.ReleaseSafe();
 
             MaterialBuffer.ReleaseSafe();
@@ -254,6 +257,7 @@ namespace TrueTrace {
                             case 9: _Materials[SelectedTex.TexObjList[j].x].SecondaryAlbedoTex = VectoredTexIndex; break;
                             case 10: _Materials[SelectedTex.TexObjList[j].x].SecondaryAlbedoMask = VectoredTexIndex; break;
                             case 11: _Materials[SelectedTex.TexObjList[j].x].SecondaryNormalTex = VectoredTexIndex; break;
+                            case 12: _Materials[SelectedTex.TexObjList[j].x].DisplacementTex = VectoredTexIndex; break;
                             default: break;
                         }
                 }
@@ -380,6 +384,7 @@ namespace TrueTrace {
                                 else if(TempRect.TexType == 5)  _Materials[SelectedTex.TexObjList[j].x].RoughnessTex = PackRect(RectSelect);
                                 else if(TempRect.TexType == 6)  _Materials[SelectedTex.TexObjList[j].x].MatCapMask = PackRect(RectSelect);
                                 else if(TempRect.TexType == 10)  _Materials[SelectedTex.TexObjList[j].x].SecondaryAlbedoMask = PackRect(RectSelect);
+                                else if(TempRect.TexType == 12)  _Materials[SelectedTex.TexObjList[j].x].DisplacementTex = PackRect(RectSelect);
                             break;
                             case 5: 
                                 _Materials[SelectedTex.TexObjList[j].x].EmissiveTex = PackRect(RectSelect); 
@@ -578,6 +583,7 @@ namespace TrueTrace {
                         if(TempMat.MatCapTex.x != 0) KeyCheck(MatCount, Obj.MatCapTexs[(int)TempMat.MatCapTex.x-1], ref BindlessDict, ref BindlessRect, 4, 7);
                         if(TempMat.SecondaryAlbedoTex.x != 0) KeyCheck(MatCount, Obj.SecondaryAlbedoTexs[(int)TempMat.SecondaryAlbedoTex.x-1], ref BindlessDict, ref BindlessRect, 4, 9);
                         if(TempMat.SecondaryAlbedoMask.x != 0) KeyCheck(MatCount, Obj.SecondaryAlbedoTexMasks[(int)TempMat.SecondaryAlbedoMask.x-1], ref BindlessDict, ref BindlessRect, Obj.SecondaryAlbedoTexMaskChannelIndex[(int)TempMat.SecondaryAlbedoMask.x-1], 10);
+                        if(TempMat.DisplacementTex.x != 0) KeyCheck(MatCount, Obj.DisplacementTexs[(int)TempMat.DisplacementTex.x-1], ref BindlessDict, ref BindlessRect, Obj.DisplacementTexChannelIndex[(int)TempMat.DisplacementTex.x-1], 12);
                     #else
                         if(TempMat.AlbedoTex.x != 0) KeyCheck(MatCount, Obj.AlbedoTexs[(int)TempMat.AlbedoTex.x-1], ref AlbTextures, ref AlbRect, 0, 0);
                         if(TempMat.NormalTex.x != 0) KeyCheck(MatCount, Obj.NormalTexs[(int)TempMat.NormalTex.x-1], ref NormTextures, ref NormRect, 0, 1);
@@ -590,6 +596,7 @@ namespace TrueTrace {
                         if(TempMat.MatCapTex.x != 0) KeyCheck(MatCount, Obj.MatCapTexs[(int)TempMat.MatCapTex.x-1], ref AlbTextures, ref AlbRect, 0, 7);
                         if(TempMat.SecondaryAlbedoTex.x != 0) KeyCheck(MatCount, Obj.SecondaryAlbedoTexs[(int)TempMat.SecondaryAlbedoTex.x-1], ref AlbTextures, ref AlbRect, 0, 9);
                         if(TempMat.SecondaryAlbedoMask.x != 0) KeyCheck(MatCount, Obj.SecondaryAlbedoTexMasks[(int)TempMat.SecondaryAlbedoMask.x-1], ref SingleComponentTexture, ref SingleComponentRect, Obj.SecondaryAlbedoTexMaskChannelIndex[(int)TempMat.SecondaryAlbedoMask.x-1], 10);
+                        if(TempMat.DisplacementTex.x != 0) KeyCheck(MatCount, Obj.DisplacementTexs[(int)TempMat.DisplacementTex.x-1], ref SingleComponentTexture, ref SingleComponentRect, Obj.DisplacementTexChannelIndex[(int)TempMat.DisplacementTex.x-1], 12);
                     #endif
                     _Materials[MatCount] = TempMat;
                     MatCount++;
@@ -615,6 +622,7 @@ namespace TrueTrace {
                         if(TempMat.MatCapTex.x != 0) KeyCheck(MatCount, Obj.MatCapTexs[(int)TempMat.MatCapTex.x-1], ref BindlessDict, ref BindlessRect, 4, 7);
                         if(TempMat.SecondaryAlbedoTex.x != 0) KeyCheck(MatCount, Obj.SecondaryAlbedoTexs[(int)TempMat.SecondaryAlbedoTex.x-1], ref BindlessDict, ref BindlessRect, 4, 9);
                         if(TempMat.SecondaryAlbedoMask.x != 0) KeyCheck(MatCount, Obj.SecondaryAlbedoTexMasks[(int)TempMat.SecondaryAlbedoMask.x-1], ref BindlessDict, ref BindlessRect, Obj.SecondaryAlbedoTexMaskChannelIndex[(int)TempMat.SecondaryAlbedoMask.x-1], 10);
+                        if(TempMat.DisplacementTex.x != 0) KeyCheck(MatCount, Obj.DisplacementTexs[(int)TempMat.DisplacementTex.x-1], ref BindlessDict, ref BindlessRect, Obj.DisplacementTexChannelIndex[(int)TempMat.DisplacementTex.x-1], 12);
                     #else
                         if(TempMat.AlbedoTex.x != 0) KeyCheck(MatCount, Obj.AlbedoTexs[(int)TempMat.AlbedoTex.x-1], ref AlbTextures, ref AlbRect, 0, 0);
                         if(TempMat.NormalTex.x != 0) KeyCheck(MatCount, Obj.NormalTexs[(int)TempMat.NormalTex.x-1], ref NormTextures, ref NormRect, 0, 1);
@@ -627,6 +635,7 @@ namespace TrueTrace {
                         if(TempMat.MatCapTex.x != 0) KeyCheck(MatCount, Obj.MatCapTexs[(int)TempMat.MatCapTex.x-1], ref AlbTextures, ref AlbRect, 0, 7);
                         if(TempMat.SecondaryAlbedoTex.x != 0) KeyCheck(MatCount, Obj.SecondaryAlbedoTexs[(int)TempMat.SecondaryAlbedoTex.x-1], ref AlbTextures, ref AlbRect, 0, 9);
                         if(TempMat.SecondaryAlbedoMask.x != 0) KeyCheck(MatCount, Obj.SecondaryAlbedoTexMasks[(int)TempMat.SecondaryAlbedoMask.x-1], ref SingleComponentTexture, ref SingleComponentRect, Obj.SecondaryAlbedoTexMaskChannelIndex[(int)TempMat.SecondaryAlbedoMask.x-1], 10);
+                        if(TempMat.DisplacementTex.x != 0) KeyCheck(MatCount, Obj.DisplacementTexs[(int)TempMat.DisplacementTex.x-1], ref SingleComponentTexture, ref SingleComponentRect, Obj.DisplacementTexChannelIndex[(int)TempMat.DisplacementTex.x-1], 12);
                     #endif
                     _Materials[MatCount] = TempMat;
                     MatCount++;
@@ -832,6 +841,7 @@ namespace TrueTrace {
             LightTreeBufferB.ReleaseSafe();
             BVH8AggregatedBuffer.ReleaseSafe();
             AggTriBufferA.ReleaseSafe();
+            PrismBuffer.ReleaseSafe();
             AggTriBufferB.ReleaseSafe();
 
             if(WorkingBuffer != null) for(int i = 0; i < WorkingBuffer.Length; i++) WorkingBuffer[i]?.Release();
@@ -962,6 +972,7 @@ namespace TrueTrace {
             LightTreeBufferB.ReleaseSafe();
             BVH8AggregatedBuffer.ReleaseSafe();
             AggTriBufferA.ReleaseSafe();
+            PrismBuffer.ReleaseSafe();
             AggTriBufferB.ReleaseSafe();
             MeshFunctions = Resources.Load<ComputeShader>("Utility/GeneralMeshFunctions");
             TriangleBufferKernel = MeshFunctions.FindKernel("CombineTriBuffers");
@@ -1235,6 +1246,7 @@ namespace TrueTrace {
                 {
                     BVH8AggregatedBuffer.Release();
                     AggTriBufferA.Release();
+                    PrismBuffer.Release();
                     AggTriBufferB.Release();
                     LightTriBuffer.Release();
                     if(LightTreeBufferA != null) LightTreeBufferA.Release();
@@ -1277,6 +1289,7 @@ namespace TrueTrace {
 
                     CommonFunctions.CreateDynamicBuffer(ref BVH8AggregatedBuffer, AggNodeCount, 80);
                     CommonFunctions.CreateDynamicBuffer(ref AggTriBufferA, AggTriCount, CommonFunctions.GetStride<CudaTriangleA>());
+                    CommonFunctions.CreateDynamicBuffer(ref PrismBuffer, AggTriCount, CommonFunctions.GetStride<Prism>());
                     CommonFunctions.CreateDynamicBuffer(ref AggTriBufferB, AggTriCount, CommonFunctions.GetStride<CudaTriangleB>());
                     CommonFunctions.CreateDynamicBuffer(ref LightTriBuffer, LightTriCount, CommonFunctions.GetStride<LightTriData>());
 #if !DontUseSGTree
@@ -1287,6 +1300,7 @@ namespace TrueTrace {
                     CommonFunctions.CreateDynamicBuffer(ref LightTreeBufferB, AggSGTreeNodeCount, CommonFunctions.GetStride<CompactLightBVHData>());
 #endif
                     MeshFunctions.SetBuffer(TriangleBufferKernel, "OutCudaTriArrayA", AggTriBufferA);
+                    MeshFunctions.SetBuffer(TriangleBufferKernel, "OutPrismArray", PrismBuffer);
                     MeshFunctions.SetBuffer(TriangleBufferKernel, "OutCudaTriArrayB", AggTriBufferB);
                     MeshFunctions.SetBuffer(NodeBufferKernel, "OutAggNodes", BVH8AggregatedBuffer);
                     MeshFunctions.SetBuffer(LightBufferKernel, "LightTrianglesOut", LightTriBuffer);
@@ -1307,6 +1321,7 @@ namespace TrueTrace {
                         cmd.SetComputeIntParam(MeshFunctions, "Offset", CurTriOffset);
                         cmd.SetComputeIntParam(MeshFunctions, "Count", RenderQue[i].TriBuffer.count);
                         cmd.SetComputeBufferParam(MeshFunctions, TriangleBufferKernel, "InCudaTriArray", RenderQue[i].TriBuffer);
+                        cmd.SetComputeBufferParam(MeshFunctions, TriangleBufferKernel, "InPrismArray", RenderQue[i].PrismBuffer);
                         cmd.DispatchCompute(MeshFunctions, TriangleBufferKernel, (int)Mathf.Ceil(RenderQue[i].TriBuffer.count / 372.0f), 1, 1);
                         // cmd.EndSample("AccumBufferTri");
 
@@ -2392,6 +2407,8 @@ namespace TrueTrace {
                     TempMat.Rotation = CurrentMaterial.Rotation[Index] * 3.14159f;
                     TempMat.ColorBleed = CurrentMaterial.ColorBleed[Index];
                     TempMat.AlbedoBlendFactor = CurrentMaterial.AlbedoBlendFactor[Index];
+                    TempMat.DisplacementTexScaleOffset = CurrentMaterial.DisplacementTexScaleOffset[Index];
+                    TempMat.RotationDisplacement = CurrentMaterial.RotationDisplacement[Index];
                     if(RayMaster.LocalTTSettings.MatChangeResetsAccum) {
                         RayTracingMaster.SampleCount = 0;
                         RayMaster.FramesSinceStart = 0;

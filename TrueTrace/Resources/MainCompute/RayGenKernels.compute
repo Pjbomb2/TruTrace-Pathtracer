@@ -26,7 +26,7 @@ void Generate(uint3 id : SV_DispatchThreadID) {
     if(OIDNGuideWrite || UseASVGFAndReSTIR) jitter = 0;
     float2 uv = float2((id.xy + jitter) / float2(screen_width, screen_height) * 2.0f - 1.0f);
     SmallerRay ray = CreateCameraRay(uv, pixel_index);
-    RayData globray = {ray.origin + NearPlane * ray.direction, pixel_index, ray.direction, 0, 0,0,asuint(FarPlane),0};
+    RayData globray = {ray.origin + NearPlane * ray.direction, pixel_index, ray.direction, 0, 0,0,asuint(FarPlane),0,0};
     GlobalRays[pixel_index] = globray;
 }
 
@@ -38,7 +38,7 @@ void GIReTraceKernel(uint3 id : SV_DispatchThreadID, uint3 id2 : SV_GroupThreadI
 
     float2 uv = float2((id.xy) / float2(screen_width, screen_height));
     SmallerRay ray = CreateCameraRay(uv * 2.0f - 1.0f, pixel_index);
-    RayData globray = {ray.origin + NearPlane * ray.direction, pixel_index, ray.direction, 0, 0,0,asuint(FarPlane),0};
+    RayData globray = {ray.origin + NearPlane * ray.direction, pixel_index, ray.direction, 0, 0,0,asuint(FarPlane),0,0};
     RandomNumsWrite[id.xy] = float4(frames_accumulated, pixel_index, 0, 0);
 
     if(curframe % ReSTIRGIUpdateRate == pixel_index % ReSTIRGIUpdateRate) {
@@ -78,7 +78,7 @@ void GeneratePanorama(uint3 id : SV_DispatchThreadID) {
         ray = CreateCameraRay(uv, pixel_index);
         ray.origin = ray.origin + NearPlane * ray.direction;
     }
-    RayData globray = {ray.origin, pixel_index, ray.direction, 0, 0,0,asuint(FarPlane),0};
+    RayData globray = {ray.origin, pixel_index, ray.direction, 0, 0,0,asuint(FarPlane),0,0};
     GlobalRays[pixel_index] = globray;
 }
 

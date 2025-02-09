@@ -153,6 +153,7 @@ namespace CommonVars
         public Vector2Int SecondaryAlbedoTex;
         public Vector2Int SecondaryAlbedoMask;
         public Vector2Int SecondaryNormalTex;
+        public Vector2Int DisplacementTex;
         public Vector3 BaseColor;
         public float emission;
         public Vector3 EmissionColor;
@@ -197,6 +198,8 @@ namespace CommonVars
         public Vector4 SecondaryNormalTexScaleOffset;
         public float SecondaryNormalTexBlend;
         public float DetailNormalStrength;
+        public Vector4 DisplacementTexScaleOffset;
+        public float RotationDisplacement;
     }
 
     [System.Serializable]
@@ -593,6 +596,18 @@ namespace CommonVars
     }
 
     [System.Serializable]
+    public struct Prism
+    {
+        public Vector3 v0;
+        public Vector3 v1;
+        public Vector3 v2;
+
+        public Vector3 e0;
+        public Vector3 e1;
+        public Vector3 e2;
+    }
+
+    [System.Serializable]
     public struct CudaTriangle
     {
         public Vector3 pos0;
@@ -696,7 +711,7 @@ namespace CommonVars
         public int ReadIndex;
         public List<Vector3Int> TexObjList = new List<Vector3Int>();
     }   
-    public enum TexturePurpose {Albedo, Alpha, Normal, Emission, Metallic, Roughness, MatCapTex, MatCapMask, SecondaryAlbedoTexture, SecondaryAlbedoTextureMask, SecondaryNormalTexture};
+    public enum TexturePurpose {Albedo, Alpha, Normal, Emission, Metallic, Roughness, MatCapTex, MatCapMask, SecondaryAlbedoTexture, SecondaryAlbedoTextureMask, SecondaryNormalTexture, Displacement};
 
     [System.Serializable]
     public class TexturePairs {
@@ -782,6 +797,8 @@ namespace CommonVars
         public Vector4 SecondaryNormalTexScaleOffset;
         public float SecondaryNormalTexBlend;
         public float DetailNormalStrength;
+        public Vector4 DisplacementTexScaleOffset;
+        public float RotationDisplacement;
 
 
 
@@ -795,6 +812,7 @@ namespace CommonVars
         public string SecondaryAlbedoGUID;
         public string SecondaryAlbedoMaskGUID;
         public string NormalGUID;
+        public string DisplacementGUID;
         public string ShaderName;
     }
     [System.Serializable]

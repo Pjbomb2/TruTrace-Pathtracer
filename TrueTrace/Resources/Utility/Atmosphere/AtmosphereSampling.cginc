@@ -352,7 +352,6 @@ float3 GetSkyTransmittance(
 Texture3D<float4> CloudShapeDetailTex;
 Texture3D<float4> CloudShapeTex;
 Texture2D<float4> localWeatherTexture;
-SamplerState my_linear_repeat_sampler;
 
 // Scattering parameters
 #define albedo float3(0.98, 0.98, 0.98)
