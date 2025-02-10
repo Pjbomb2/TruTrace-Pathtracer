@@ -20,6 +20,7 @@ struct CudaTriangleB {
 	uint VertColC;
 
 	uint IsEmissive;
+	float WMAX;
 };
 
 struct Prism {

@@ -40,7 +40,7 @@ MonoBehaviour:
   ReSTIRGISpatialRadius: 50
   ReSTIRGITemporalMCap: 20
   ReSTIRGIUpdateRate: 0
-  DoReSTIRGIConnectionValidation: 1
+  DoReSTIRGIConnectionValidation: 0
   Exposure: 5.4
   DoPartialRendering: 0
   PartialRenderingFactor: 1

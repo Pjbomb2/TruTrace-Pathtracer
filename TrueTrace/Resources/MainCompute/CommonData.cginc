@@ -2033,7 +2033,10 @@ bool IntersectPrism(Prism prism, SmallerRay ray, CudaTriangleA TriUVs, CudaTrian
 	IntersectPrismTriangle(prism.v0, prism.v1, prism.v2, ray, MinMax, ray_hit.t);
 	IntersectPrismTriangle(prism.e2, prism.e1, prism.e0, ray, MinMax, ray_hit.t);
 	
-	if(!IntersectPrismTriangle2(prism.v0, prism.v1, prism.v2, ray)) return false;
+	bool IntersectsBottom = IntersectPrismTriangle2(prism.v0, prism.v1, prism.v2, ray);
+	bool IntersectsTop = IntersectPrismTriangle2(prism.e2, prism.e1, prism.e0, ray);
+
+	if(!IntersectsBottom && !IntersectsTop) return false;
 
 
 	float dt = 0.0055f;
@@ -2073,11 +2076,11 @@ bool IntersectPrism(Prism prism, SmallerRay ray, CudaTriangleA TriUVs, CudaTrian
 		float3 n1 = i_octahedral_32(TriNorms.norms.y);
 		float3 n2 = i_octahedral_32(TriNorms.norms.z);
 
-		float Divisor = 20.0f;
+		float Divisor = 1.0f / (TriNorms.WMAX-0.0001f);
     	int MaterialIndex = (MatOffset + TriUVs.MatDat);
     	MaterialData Mat = _Materials[MaterialIndex];
 
-		float hsurf = 0;
+		float hsurf = -1;
 		float3 b;
 		int CurStep = 0;
 		while(hray > hsurf && t < MinMax.y && CurStep < 100) {
@@ -2091,7 +2094,7 @@ bool IntersectPrism(Prism prism, SmallerRay ray, CudaTriangleA TriUVs, CudaTrian
 			float3 p = prism.v0 * b.x + prism.v1 * b.y + prism.v2 * b.z;
 			hray = dot(s - p, s - p);
 			float2 uv = TOHALF(TriUVs.tex0) * b.x + TOHALF(TriUVs.texedge1) * b.y + TOHALF(TriUVs.texedge2) * b.z;
-			hsurf = clamp((SampleTexture(uv * 1.0f, SampleDisplacement, Mat))/Divisor+0.01f, 0.00f, 0.04f);
+			hsurf = clamp((SampleTexture(uv * 1.0f, SampleDisplacement, Mat))/Divisor+0.0001f, 0.00f, 1.0f);
 			hsurf *= hsurf;
 			// dt += 0.00001f;
 			t = t + dt;
@@ -2099,14 +2102,15 @@ bool IntersectPrism(Prism prism, SmallerRay ray, CudaTriangleA TriUVs, CudaTrian
 			ns = n0 * b.x + n1 * b.y + n2 * b.z;
 		}
 		Rep3 += CurStep;
-		if(hray < hsurf && ray_hit.t > t) {
+		if((hray <= hsurf || (IntersectsBottom && IntersectsTop && hsurf <= (0.01f * 0.01f))) && ray_hit.t > t) {
+		// if((hray <= hsurf) && ray_hit.t > t) {
 			// MinMax = float2(t, t);
 			// IntersectPrismTriangle2(c0, c1, c2, ray, MinMax, ray_hit);
 			// t = MinMax.y - 2.0f * dt;
 			float3 phit = ray.origin + ray.direction * t;
 			b = triangleBarycentric(phit, c0, c1, c2);
 			float3 N = n0 * b.x + n1 * b.y + n2 * b.z;
-			float FinDiff = 0.0001f;
+			float FinDiff = 0.001f;
 			float2 uva = TOHALF(TriUVs.tex0) * b.x + TOHALF(TriUVs.texedge1) * b.y + TOHALF(TriUVs.texedge2) * b.z;
 			float2 uvb = TOHALF(TriUVs.tex0) * (b.x+FinDiff) + TOHALF(TriUVs.texedge1) * b.y + TOHALF(TriUVs.texedge2) * (b.z-FinDiff);
 			float2 uvc = TOHALF(TriUVs.tex0) * b.x + TOHALF(TriUVs.texedge1) * (b.y+FinDiff) + TOHALF(TriUVs.texedge2) * (b.z-FinDiff);
@@ -2116,13 +2120,13 @@ bool IntersectPrism(Prism prism, SmallerRay ray, CudaTriangleA TriUVs, CudaTrian
 			float3 pc = prism.v0 * b.x + prism.v1 * (b.y+FinDiff) + prism.v2 * (b.z-FinDiff);
 			
 
-			float3 sa = pa + N * clamp((SampleTexture(uva * 1.0f, SampleDisplacement, Mat))/Divisor+0.01f, 0.00f, 0.04f);
-			float3 sb = pb + N * clamp((SampleTexture(uvb * 1.0f, SampleDisplacement, Mat))/Divisor+0.01f, 0.00f, 0.04f);
-			float3 sc = pc + N * clamp((SampleTexture(uvc * 1.0f, SampleDisplacement, Mat))/Divisor+0.01f, 0.00f, 0.04f);
+			float3 sa = pa + N * clamp((SampleTexture(uva * 1.0f, SampleDisplacement, Mat))/Divisor+0.0001f, 0.00f, 1.00f);
+			float3 sb = pb + N * clamp((SampleTexture(uvb * 1.0f, SampleDisplacement, Mat))/Divisor+0.0001f, 0.00f, 1.00f);
+			float3 sc = pc + N * clamp((SampleTexture(uvc * 1.0f, SampleDisplacement, Mat))/Divisor+0.0001f, 0.00f, 1.00f);
 
-			float3 Ns = (cross((sc - sa), (sb - sa)))/FinDiff;
+			float3 Ns = (cross((sc - sa), (sb - sa)))/(FinDiff*FinDiff);
 
-			RunningNorm = normalize(Ns);
+			RunningNorm = normalize(Ns-n+N);
 
 
             ray_hit.t = t;//- 2.0f * dt;
@@ -2146,7 +2150,7 @@ bool IntersectPrismShadow(Prism prism, SmallerRay ray, CudaTriangleA TriUVs, Cud
 	IntersectPrismTriangle(prism.v0, prism.v1, prism.v2, ray, MinMax, max_distance);
 	IntersectPrismTriangle(prism.e2, prism.e1, prism.e0, ray, MinMax, max_distance);
 
-	if(!IntersectPrismTriangle2(prism.v0, prism.v1, prism.v2, ray)) return false;
+	if(!IntersectPrismTriangle2(prism.v0, prism.v1, prism.v2, ray) && !IntersectPrismTriangle2(prism.e2, prism.e1, prism.e0, ray)) return false;
 
 
 	float dt = 0.0055f;
@@ -2181,7 +2185,7 @@ bool IntersectPrismShadow(Prism prism, SmallerRay ray, CudaTriangleA TriUVs, Cud
 		float3 n1 = i_octahedral_32(TriNorms.norms.y);
 		float3 n2 = i_octahedral_32(TriNorms.norms.z);
 
-		float Divisor = 20.0f;
+		float Divisor = 1.0f / (TriNorms.WMAX-0.0001f);
     	int MaterialIndex = (MatOffset + TriUVs.MatDat);
     	MaterialData Mat = _Materials[MaterialIndex];
 
@@ -2199,14 +2203,14 @@ bool IntersectPrismShadow(Prism prism, SmallerRay ray, CudaTriangleA TriUVs, Cud
 			float3 p = prism.v0 * b.x + prism.v1 * b.y + prism.v2 * b.z;
 			hray = dot(s - p, s - p);
 			float2 uv = TOHALF(TriUVs.tex0) * b.x + TOHALF(TriUVs.texedge1) * b.y + TOHALF(TriUVs.texedge2) * b.z;
-			hsurf = clamp((SampleTexture(uv * 1.0f, SampleDisplacement, Mat))/Divisor+0.01f, 0.00f, 0.04f);
+			hsurf = clamp((SampleTexture(uv * 1.0f, SampleDisplacement, Mat))/Divisor+0.0001f, 0.00f, 1.0f);
 			hsurf *= hsurf;
 			// dt += 0.00001f;
 			t = t + dt;
 			s = s + ray.direction * dt;
 			ns = n0 * b.x + n1 * b.y + n2 * b.z;
 		}
-		if(hray < hsurf && max_distance > t) {
+		if(hray <= hsurf && max_distance > t) {
 			return true;
 		}
 

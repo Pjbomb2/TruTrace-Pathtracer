@@ -23,6 +23,7 @@ struct CudaTriangle {
 	uint MatDat;
 
 	uint IsEmissive;
+	float WMAX;
 };
 
 
@@ -57,6 +58,7 @@ void CombineTriBuffers(uint3 id : SV_DispatchThreadID)
 	OutCudaTriArrayB[id.x + Offset].VertColB = InCudaTriArray[id.x].VertColB;
 	OutCudaTriArrayB[id.x + Offset].VertColC = InCudaTriArray[id.x].VertColC;
 	OutCudaTriArrayB[id.x + Offset].IsEmissive = InCudaTriArray[id.x].IsEmissive;
+	OutCudaTriArrayB[id.x + Offset].WMAX = InCudaTriArray[id.x].WMAX;
 	
 	OutPrismArray[id.x + Offset] = InPrismArray[id.x];
 

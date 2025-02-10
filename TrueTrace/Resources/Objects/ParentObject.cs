@@ -367,6 +367,9 @@ namespace TrueTrace {
             List<Vector2> EmissionTexWidthHeight;
         #endif
 
+        List<Color[]> DisplacementTexPixels;
+        List<Vector2> DisplacementTexWidthHeight;
+
         private void TextureParseScaleOffset(Material Mat, string TexName, ref Vector4 ScaleOffset) {
             if (Mat.HasProperty(TexName) && Mat.GetTexture(TexName) != null) {
                 Vector2 Offset = Mat.GetTextureOffset(TexName);
@@ -387,7 +390,7 @@ namespace TrueTrace {
             }
         }
 
-        private int TextureParse(ref Vector4 RefMat, Material Mat, string TexName, ref List<Texture> Texs, ref int TextureIndex, bool IsEmission = false) {
+        private int TextureParse(ref Vector4 RefMat, Material Mat, string TexName, ref List<Texture> Texs, ref int TextureIndex, bool IsEmission = false, bool IsDisplacement = false) {
             TextureIndex = 0;
             if (Mat.HasProperty(TexName) && Mat.GetTexture(TexName) != null) {
                 if(RefMat.x == 0) RefMat = new Vector4(Mat.GetTextureScale(TexName).x, Mat.GetTextureScale(TexName).y, Mat.GetTextureOffset(TexName).x, Mat.GetTextureOffset(TexName).y);
@@ -397,7 +400,7 @@ namespace TrueTrace {
                     return 0;
                 } else {
                     #if AccurateLightTris
-                        if(IsEmission) {
+                        if(IsEmission || IsDisplacement) {
                             RenderTexture tmp = RenderTexture.GetTemporary( 
                                 Tex.width,
                                 Tex.height,
@@ -415,9 +418,14 @@ namespace TrueTrace {
                             RenderTexture.active = previous;
                             RenderTexture.ReleaseTemporary(tmp);
 
-                            EmissionTexPixels.Add(myTexture2D.GetPixels(0));
+                            if(IsEmission) {
+                                EmissionTexPixels.Add(myTexture2D.GetPixels(0));
+                                EmissionTexWidthHeight.Add(new Vector2(Tex.width, Tex.height));
+                            } else if(IsDisplacement) {
+                                DisplacementTexPixels.Add(myTexture2D.GetPixels(0));
+                                DisplacementTexWidthHeight.Add(new Vector2(Tex.width, Tex.height));
+                            }
                             DestroyImmediate(myTexture2D);
-                            EmissionTexWidthHeight.Add(new Vector2(Tex.width, Tex.height));
                         }
                     #endif
                     Texs.Add(Tex);
@@ -437,7 +445,9 @@ namespace TrueTrace {
         {//Creates texture atlas
             #if AccurateLightTris
                 EmissionTexPixels = new List<Color[]>();
+                DisplacementTexPixels = new List<Color[]>();
                 EmissionTexWidthHeight = new List<Vector2>();
+                DisplacementTexWidthHeight = new List<Vector2>();
             #endif
             _Materials.Clear();
             MemorySafeClear<Texture>(ref AlbedoTexs);
@@ -535,7 +545,7 @@ namespace TrueTrace {
                         }
                         switch((TexturePurpose)TexPurpose) {
                             case(TexturePurpose.Displacement):
-                                Result = TextureParse(ref TempScale, SharedMaterials[i], TexName, ref DisplacementTexs, ref TempIndex); 
+                                Result = TextureParse(ref TempScale, SharedMaterials[i], TexName, ref DisplacementTexs, ref TempIndex, false, true); 
                                 CurMat.DisplacementTex.x = TempIndex; 
                                 if(Result == 1) DisplacementTexChannelIndex.Add(ReadIndex);
                             break;
@@ -1366,7 +1376,38 @@ namespace TrueTrace {
                     TempTri.IsEmissive = 0;
                     
                     Vector3 GeomNorm = -(Vector3.Cross(TempTri.posedge1.normalized, TempTri.posedge2.normalized)).normalized;
-                    WMAX = 0.041f;
+
+
+                    float RunningMaxHeight = 0;
+                    if(_Materials[(int)TempTri.MatDat].DisplacementTex.x != 0) {
+                        int ThisIndex = _Materials[(int)TempTri.MatDat].DisplacementTex.x - 1;
+                        Vector2 UVVA = new Vector2(Mathf.HalfToFloat((ushort)(TempTri.tex0 >> 16)), Mathf.HalfToFloat((ushort)(TempTri.tex0 & 0xFFFF)));
+                        Vector2 UVVB = new Vector2(Mathf.HalfToFloat((ushort)(TempTri.texedge1 >> 16)), Mathf.HalfToFloat((ushort)(TempTri.texedge1 & 0xFFFF))); 
+                        Vector2 UVVC = new Vector2(Mathf.HalfToFloat((ushort)(TempTri.texedge2 >> 16)), Mathf.HalfToFloat((ushort)(TempTri.texedge2 & 0xFFFF)));
+                        int resolution = 64;
+                        for (int y = 0; y < resolution; y++)
+                        {
+                            for (int x = 0; x < resolution; x++)
+                            {
+                                // Convert (x, y) into barycentric coordinates
+                                float u = (float)x / (resolution - 1);
+                                float v = (float)y / (resolution - 1);
+                                float w = 1 - u - v;
+
+                                // Ensure we are inside the triangle
+                                if (w < 0 || u < 0 || v < 0) continue;
+
+                                // Interpolate UV coordinates
+                                Vector2 uv = UVVA * w + UVVB * u + UVVC * v;
+                                int UVIndex = (int)Mathf.Max((Mathf.Floor(uv.y * (DisplacementTexWidthHeight[ThisIndex].y)) * DisplacementTexWidthHeight[ThisIndex].x + Mathf.Floor(uv.x * DisplacementTexWidthHeight[ThisIndex].x)),0);
+                                // if(UVIndex >= DisplacementTexWidthHeight[ThisIndex].y * DisplacementTexWidthHeight[ThisIndex].x) Debug.LogError("FUCK");
+                                UVIndex = (int)Mathf.Min(DisplacementTexWidthHeight[ThisIndex].y * DisplacementTexWidthHeight[ThisIndex].x-1, UVIndex);
+                                RunningMaxHeight = Mathf.Max(RunningMaxHeight, DisplacementTexPixels[ThisIndex][UVIndex].r);
+                            }
+                        }
+
+                    }
+                    RunningMaxHeight *= WMAX;
 
 
                     AggPrisms[OffsetReal].v0 = TempTri.pos0;
@@ -1376,15 +1417,17 @@ namespace TrueTrace {
                     if(Mathf.Abs(Val) < 0.00001f) Val = 0;
                     else Val = 1.0f / Val;
 
-                    AggPrisms[OffsetReal].e0 = AggPrisms[OffsetReal].v0 + WMAX * Val * -CommonFunctions.UnpackOctahedral(TempTri.norm0);
+                    AggPrisms[OffsetReal].e0 = AggPrisms[OffsetReal].v0 + RunningMaxHeight * Val * -CommonFunctions.UnpackOctahedral(TempTri.norm0);
                     Val = Vector3.Dot(-CommonFunctions.UnpackOctahedral(TempTri.norm1), GeomNorm);
                     if(Mathf.Abs(Val) < 0.00001f) Val = 0;
                     else Val = 1.0f / Val;
-                    AggPrisms[OffsetReal].e1 = AggPrisms[OffsetReal].v1 + WMAX * Val * -CommonFunctions.UnpackOctahedral(TempTri.norm1);
+                    AggPrisms[OffsetReal].e1 = AggPrisms[OffsetReal].v1 + RunningMaxHeight * Val * -CommonFunctions.UnpackOctahedral(TempTri.norm1);
                     Val = Vector3.Dot(-CommonFunctions.UnpackOctahedral(TempTri.norm2), GeomNorm);
                     if(Mathf.Abs(Val) < 0.00001f) Val = 0;
                     else Val = 1.0f / Val;
-                    AggPrisms[OffsetReal].e2 = AggPrisms[OffsetReal].v2 + WMAX * Val * -CommonFunctions.UnpackOctahedral(TempTri.norm2);
+                    AggPrisms[OffsetReal].e2 = AggPrisms[OffsetReal].v2 + RunningMaxHeight * Val * -CommonFunctions.UnpackOctahedral(TempTri.norm2);
+
+                    TempTri.WMAX = WMAX;
 
                     AggTriangles[OffsetReal] = TempTri;
                     Triangles[OffsetReal].Create(V1, V2);

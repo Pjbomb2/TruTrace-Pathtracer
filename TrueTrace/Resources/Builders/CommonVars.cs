@@ -632,6 +632,7 @@ namespace CommonVars
 
         public uint MatDat;
         public uint IsEmissive;
+        public float WMAX;
     }
 
 
@@ -666,6 +667,7 @@ namespace CommonVars
         public uint VertColC;
         
         public uint IsEmissive;
+        public float WMAX;
     }
 
     [System.Serializable]
