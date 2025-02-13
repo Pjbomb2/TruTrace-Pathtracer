@@ -1973,6 +1973,36 @@ inline bool IntersectPrismTriangle2(float3 pos0, float3 v1, float3 v2, SmallerRa
     return true;
 }
 
+inline float IntersectPrismTriangle3(float3 pos0, float3 v1, float3 v2, SmallerRay ray) {
+	float3 posedge1 = v1 - pos0;
+	float3 posedge2 = v2 - pos0;
+
+    float3 h = cross(ray.direction, posedge2);
+    float  a = dot(posedge1, h);
+
+    float  f = rcp(a);
+    float3 s = ray.origin - pos0;
+    float  u = f * dot(s, h);
+
+    if (u >= 0.0f && u <= 1.0f) {
+        float3 q = cross(s, posedge1);
+        float  v = f * dot(ray.direction, q);
+
+        if (v >= 0.0f && u + v <= 1.0f) {
+            float t = f * dot(posedge2, q);
+
+            if (t < FarPlane) {
+                if(dot(normalize(cross(normalize(posedge1), normalize(posedge2))), ray.direction) <= 0) {
+                	return t;
+                }
+
+
+            }
+        }
+    }
+    return -1;
+}
+
 inline void IntersectPrismTriangle(float3 pos0, float3 v1, float3 v2, SmallerRay ray, inout float2 MinMax, float max_distance) {
 	float3 posedge1 = v1 - pos0;
 	float3 posedge2 = v2 - pos0;
@@ -2083,9 +2113,10 @@ bool IntersectPrism(Prism prism, SmallerRay ray, CudaTriangleA TriUVs, CudaTrian
 		float hsurf = -1;
 		float3 b;
 		int CurStep = 0;
+		float H;
 		while(hray > hsurf && t < MinMax.y && CurStep < 100) {
 			CurStep++;
-			float H = (dot(ns, (c0 - s)));
+			H = (dot(ns, (c0 - s)));
 			c0 = c0 - n0 * H;
 			c1 = c1 - n1 * H;
 			c2 = c2 - n2 * H;
@@ -2102,10 +2133,10 @@ bool IntersectPrism(Prism prism, SmallerRay ray, CudaTriangleA TriUVs, CudaTrian
 			ns = n0 * b.x + n1 * b.y + n2 * b.z;
 		}
 		Rep3 += CurStep;
-		if((hray <= hsurf || (IntersectsBottom && IntersectsTop && hsurf <= (0.01f * 0.01f))) && ray_hit.t > t) {
+		if(((IntersectsBottom && H > 0 && (dot(ns, (c0 - s))) > 0 && t >= MinMax.y) || hray <= hsurf || (IntersectsBottom && IntersectsTop && hsurf <= (0.01f * 0.01f))) && ray_hit.t > t) {
 		// if((hray <= hsurf) && ray_hit.t > t) {
-			// MinMax = float2(t, t);
-			// IntersectPrismTriangle2(c0, c1, c2, ray, MinMax, ray_hit);
+			// float t2 = IntersectPrismTriangle3(c0, c1, c2, ray);
+			// if(t2 != -1) t = t2;
 			// t = MinMax.y - 2.0f * dt;
 			float3 phit = ray.origin + ray.direction * t;
 			b = triangleBarycentric(phit, c0, c1, c2);
@@ -2150,7 +2181,11 @@ bool IntersectPrismShadow(Prism prism, SmallerRay ray, CudaTriangleA TriUVs, Cud
 	IntersectPrismTriangle(prism.v0, prism.v1, prism.v2, ray, MinMax, max_distance);
 	IntersectPrismTriangle(prism.e2, prism.e1, prism.e0, ray, MinMax, max_distance);
 
-	if(!IntersectPrismTriangle2(prism.v0, prism.v1, prism.v2, ray) && !IntersectPrismTriangle2(prism.e2, prism.e1, prism.e0, ray)) return false;
+	
+	bool IntersectsBottom = IntersectPrismTriangle2(prism.v0, prism.v1, prism.v2, ray);
+	bool IntersectsTop = IntersectPrismTriangle2(prism.e2, prism.e1, prism.e0, ray);
+
+	if(!IntersectsBottom && !IntersectsTop) return false;
 
 
 	float dt = DisplacementStepSize;
@@ -2192,9 +2227,10 @@ bool IntersectPrismShadow(Prism prism, SmallerRay ray, CudaTriangleA TriUVs, Cud
 		float hsurf = 0;
 		float3 b;
 		int CurStep = 0;
+		float H;
 		while(hray > hsurf && t < MinMax.y && CurStep < 100) {
 			CurStep++;
-			float H = (dot(ns, (c0 - s)));
+			H = (dot(ns, (c0 - s)));
 			c0 = c0 - n0 * H;
 			c1 = c1 - n1 * H;
 			c2 = c2 - n2 * H;
@@ -2210,7 +2246,8 @@ bool IntersectPrismShadow(Prism prism, SmallerRay ray, CudaTriangleA TriUVs, Cud
 			s = s + ray.direction * dt;
 			ns = n0 * b.x + n1 * b.y + n2 * b.z;
 		}
-		if(hray <= hsurf && max_distance > t) {
+		if(((IntersectsBottom && H > 0 && (dot(ns, (c0 - s))) > 0 && t >= MinMax.y) || hray <= hsurf || (IntersectsBottom && IntersectsTop && hsurf <= (0.01f * 0.01f))) && max_distance > t) {
+		// if(hray <= hsurf && max_distance > t) {
 			return true;
 		}
 

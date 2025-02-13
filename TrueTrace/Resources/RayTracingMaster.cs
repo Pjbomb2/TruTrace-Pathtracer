@@ -83,7 +83,9 @@ namespace TrueTrace {
                     ColorBleed = OBJtoWrite.ColorBleed[Index],
                     SecondaryNormalTexBlend = OBJtoWrite.SecondaryNormalTexBlend[Index],
                     SecondaryNormalTexScaleOffset = OBJtoWrite.SecondaryNormalTexScaleOffset[Index],
-                    AlbedoBlendFactor = OBJtoWrite.AlbedoBlendFactor[Index]
+                    AlbedoBlendFactor = OBJtoWrite.AlbedoBlendFactor[Index],
+                    DisplacementTexScaleOffset = OBJtoWrite.DisplacementTexScaleOffset[Index],
+                    RotationDisplacement = OBJtoWrite.RotationDisplacement[Index]
                 };
                 if(WriteID == -1) {
                     raywrites.RayObj.Add(DataToWrite);
