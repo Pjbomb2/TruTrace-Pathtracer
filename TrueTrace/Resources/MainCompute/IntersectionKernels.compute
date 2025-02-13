@@ -293,7 +293,7 @@ void IntersectBVH(int ray_index, int threadIdxy, int GTx) {
                         }
                         if(CurBounce == 0 && bestHit.t == asfloat(GlobalRay.hits.z)) bestHit.t = FarPlane;
                         GlobalRays[rayidx].Norm = octahedral_32(RunningNorm);
-                        if(_Materials[AggTrisA[bestHit.triangle_id].MatDat + _MeshData[bestHit.mesh_id].MaterialOffset].DisplacementTex.x > 0 && bestHit.t != FarPlane) bestHit.t -= 2.0f * 0.0055f;
+                        if(_Materials[AggTrisA[bestHit.triangle_id].MatDat + _MeshData[bestHit.mesh_id].MaterialOffset].DisplacementTex.x > 0 && bestHit.t != FarPlane) bestHit.t -= 2.0f * DisplacementStepSize;
                         set(rayidx, bestHit);
                         KilledNaturally = true;
                         break;

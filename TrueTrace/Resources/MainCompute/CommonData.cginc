@@ -2039,7 +2039,7 @@ bool IntersectPrism(Prism prism, SmallerRay ray, CudaTriangleA TriUVs, CudaTrian
 	if(!IntersectsBottom && !IntersectsTop) return false;
 
 
-	float dt = 0.0055f;
+	float dt = DisplacementStepSize;
 	float YY = MinMax.y;
 	if(MinMax.x != FarPlane && MinMax.y != 0) YY = min(YY, ray_hit.t);
 	if(MinMax.x == ray_hit.t && MinMax.y != 0) MinMax.x = 0;
@@ -2094,7 +2094,7 @@ bool IntersectPrism(Prism prism, SmallerRay ray, CudaTriangleA TriUVs, CudaTrian
 			float3 p = prism.v0 * b.x + prism.v1 * b.y + prism.v2 * b.z;
 			hray = dot(s - p, s - p);
 			float2 uv = TOHALF(TriUVs.tex0) * b.x + TOHALF(TriUVs.texedge1) * b.y + TOHALF(TriUVs.texedge2) * b.z;
-			hsurf = clamp((SampleTexture(uv * 1.0f, SampleDisplacement, Mat))/Divisor+0.0001f, 0.00f, 1.0f);
+			hsurf = clamp((SampleTexture(uv * 1.0f, SampleDisplacement, Mat))/Divisor+0.001f, 0.00f, 1.0f);
 			hsurf *= hsurf;
 			// dt += 0.00001f;
 			t = t + dt;
@@ -2120,9 +2120,9 @@ bool IntersectPrism(Prism prism, SmallerRay ray, CudaTriangleA TriUVs, CudaTrian
 			float3 pc = prism.v0 * b.x + prism.v1 * (b.y+FinDiff) + prism.v2 * (b.z-FinDiff);
 			
 
-			float3 sa = pa + N * clamp((SampleTexture(uva * 1.0f, SampleDisplacement, Mat))/Divisor+0.0001f, 0.00f, 1.00f);
-			float3 sb = pb + N * clamp((SampleTexture(uvb * 1.0f, SampleDisplacement, Mat))/Divisor+0.0001f, 0.00f, 1.00f);
-			float3 sc = pc + N * clamp((SampleTexture(uvc * 1.0f, SampleDisplacement, Mat))/Divisor+0.0001f, 0.00f, 1.00f);
+			float3 sa = pa + N * clamp((SampleTexture(uva * 1.0f, SampleDisplacement, Mat))/Divisor+0.001f, 0.00f, 1.00f);
+			float3 sb = pb + N * clamp((SampleTexture(uvb * 1.0f, SampleDisplacement, Mat))/Divisor+0.001f, 0.00f, 1.00f);
+			float3 sc = pc + N * clamp((SampleTexture(uvc * 1.0f, SampleDisplacement, Mat))/Divisor+0.001f, 0.00f, 1.00f);
 
 			float3 Ns = (cross((sc - sa), (sb - sa)))/(FinDiff*FinDiff);
 
@@ -2153,7 +2153,7 @@ bool IntersectPrismShadow(Prism prism, SmallerRay ray, CudaTriangleA TriUVs, Cud
 	if(!IntersectPrismTriangle2(prism.v0, prism.v1, prism.v2, ray) && !IntersectPrismTriangle2(prism.e2, prism.e1, prism.e0, ray)) return false;
 
 
-	float dt = 0.0055f;
+	float dt = DisplacementStepSize;
 	float YY = MinMax.y;
 	if(MinMax.x != FarPlane && MinMax.y != 0) YY = min(YY, max_distance);
 	if(MinMax.x == max_distance && MinMax.y != 0) MinMax.x = 0;
@@ -2203,7 +2203,7 @@ bool IntersectPrismShadow(Prism prism, SmallerRay ray, CudaTriangleA TriUVs, Cud
 			float3 p = prism.v0 * b.x + prism.v1 * b.y + prism.v2 * b.z;
 			hray = dot(s - p, s - p);
 			float2 uv = TOHALF(TriUVs.tex0) * b.x + TOHALF(TriUVs.texedge1) * b.y + TOHALF(TriUVs.texedge2) * b.z;
-			hsurf = clamp((SampleTexture(uv * 1.0f, SampleDisplacement, Mat))/Divisor+0.0001f, 0.00f, 1.0f);
+			hsurf = clamp((SampleTexture(uv * 1.0f, SampleDisplacement, Mat))/Divisor+0.001f, 0.00f, 1.0f);
 			hsurf *= hsurf;
 			// dt += 0.00001f;
 			t = t + dt;

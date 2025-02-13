@@ -51,6 +51,8 @@
 
 #define FogScale 12.0f
 
+#define DisplacementStepSize 0.0055f
+
 
 //Dont change the ones below
 #define DisneyIndex 0

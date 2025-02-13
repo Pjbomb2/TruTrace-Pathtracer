@@ -1405,9 +1405,9 @@ namespace TrueTrace {
                                 RunningMaxHeight = Mathf.Max(RunningMaxHeight, DisplacementTexPixels[ThisIndex][UVIndex].r);
                             }
                         }
-
+                        RunningMaxHeight *= WMAX;
+                        RunningMaxHeight += 0.001f;
                     }
-                    RunningMaxHeight *= WMAX;
 
 
                     AggPrisms[OffsetReal].v0 = TempTri.pos0;
