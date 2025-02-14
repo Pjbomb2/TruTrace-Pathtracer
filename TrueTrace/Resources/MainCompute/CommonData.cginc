@@ -2060,6 +2060,7 @@ bool IntersectPrism(Prism prism, SmallerRay ray, CudaTriangleA TriUVs, CudaTrian
 	intersectPatch(prism.v1, prism.v0, prism.e0, prism.e1, ray, MinMax, ray_hit.t);
 	intersectPatch(prism.v0, prism.v2, prism.e2, prism.e0, ray, MinMax, ray_hit.t);
 	intersectPatch(prism.v2, prism.v1, prism.e1, prism.e2, ray, MinMax, ray_hit.t);
+	float Far = MinMax.y;
 	IntersectPrismTriangle(prism.v0, prism.v1, prism.v2, ray, MinMax, ray_hit.t);
 	IntersectPrismTriangle(prism.e2, prism.e1, prism.e0, ray, MinMax, ray_hit.t);
 	
@@ -2133,7 +2134,7 @@ bool IntersectPrism(Prism prism, SmallerRay ray, CudaTriangleA TriUVs, CudaTrian
 			ns = n0 * b.x + n1 * b.y + n2 * b.z;
 		}
 		Rep3 += CurStep;
-		if(((IntersectsBottom && H > 0 && (dot(ns, (c0 - s))) > 0 && t >= MinMax.y) || hray <= hsurf || (IntersectsBottom && IntersectsTop && hsurf <= (0.01f * 0.01f))) && ray_hit.t > t) {
+		if(((IntersectsBottom && H > 0 && (dot(ns, (c0 - s))) > 0 && t >= MinMax.y && Far == 0) || hray <= hsurf || (IntersectsBottom && IntersectsTop && hsurf <= (0.01f * 0.01f))) && ray_hit.t > t) {
 		// if((hray <= hsurf) && ray_hit.t > t) {
 			// float t2 = IntersectPrismTriangle3(c0, c1, c2, ray);
 			// if(t2 != -1) t = t2;
@@ -2178,6 +2179,7 @@ bool IntersectPrismShadow(Prism prism, SmallerRay ray, CudaTriangleA TriUVs, Cud
 	intersectPatch(prism.v1, prism.v0, prism.e0, prism.e1, ray, MinMax, max_distance);
 	intersectPatch(prism.v0, prism.v2, prism.e2, prism.e0, ray, MinMax, max_distance);
 	intersectPatch(prism.v2, prism.v1, prism.e1, prism.e2, ray, MinMax, max_distance);
+	float Far = MinMax.y;
 	IntersectPrismTriangle(prism.v0, prism.v1, prism.v2, ray, MinMax, max_distance);
 	IntersectPrismTriangle(prism.e2, prism.e1, prism.e0, ray, MinMax, max_distance);
 
@@ -2246,7 +2248,7 @@ bool IntersectPrismShadow(Prism prism, SmallerRay ray, CudaTriangleA TriUVs, Cud
 			s = s + ray.direction * dt;
 			ns = n0 * b.x + n1 * b.y + n2 * b.z;
 		}
-		if(((IntersectsBottom && H > 0 && (dot(ns, (c0 - s))) > 0 && t >= MinMax.y) || hray <= hsurf || (IntersectsBottom && IntersectsTop && hsurf <= (0.01f * 0.01f))) && max_distance > t) {
+		if(((IntersectsBottom && H > 0 && (dot(ns, (c0 - s))) > 0 && t >= MinMax.y && Far == 0) || hray <= hsurf || (IntersectsBottom && IntersectsTop && hsurf <= (0.01f * 0.01f))) && max_distance > t) {
 		// if(hray <= hsurf && max_distance > t) {
 			return true;
 		}
