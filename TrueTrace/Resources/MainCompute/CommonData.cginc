@@ -2161,7 +2161,7 @@ bool IntersectPrism(Prism prism, SmallerRay ray, CudaTriangleA TriUVs, CudaTrian
 			RunningNorm = normalize(Ns-n+N);
 
 
-            ray_hit.t = t;//- 2.0f * dt;
+            ray_hit.t = t - 2.0f * dt;
             ray_hit.u = uva.x;
             ray_hit.v = uva.y;
             ray_hit.mesh_id = mesh_id;

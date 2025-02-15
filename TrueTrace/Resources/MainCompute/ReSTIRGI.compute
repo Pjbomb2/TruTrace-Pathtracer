@@ -1021,6 +1021,7 @@ void ReSTIRGISpatial2(uint3 id : SV_DispatchThreadID) {
         RunningReservoirB.Radiance.W *= RunningReservoirB.Radiance.W < 100.0f;
         RunningReservoirC.Radiance.W *= RunningReservoirC.Radiance.W < 100.0f;
 
+        if(SurfaceMat.DisplacementTex.x <= 0) { 
         GlobalColors[pixel_index].PrimaryNEERay = packRGBE(pow(RunningReservoirC.Radiance.Color * RunningReservoirC.Radiance.W * NEEbsdf,rcp(2.2f)));
 
         if(!(SurfaceMat.metallic == 1 && SurfaceMat.roughness == 0)) {
@@ -1032,4 +1033,5 @@ void ReSTIRGISpatial2(uint3 id : SV_DispatchThreadID) {
         } else {
             GlobalColors[pixel_index].Indirect *= IndirectBoost;
         }
+    }
 }

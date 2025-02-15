@@ -297,7 +297,7 @@ inline void calcFinalColor(SmallerRay ray, inout ColData Color, MaterialData hit
         hitDat.surfaceColor = ((lum * 255.0f) + (hitDat.ColorBleed *((hitDat.surfaceColor * 255.0f) - (lum * 255.0f)))) / 255.0f;
     }
     
-    [branch] if(CurBounce == 0 && UseReSTIRGI && ReSTIRGIUpdateRate != 0 && RandomNums[id].z != 0) {
+    [branch] if(hitDat.DisplacementTex <= 0 && CurBounce == 0 && UseReSTIRGI && ReSTIRGIUpdateRate != 0 && RandomNums[id].z != 0) {
         #ifdef HDRP
             float2 MotionVector = MotionVectors[int3(id,0)].xy;
         #else
@@ -561,7 +561,7 @@ inline void calcFinalColor(SmallerRay ray, inout ColData Color, MaterialData hit
                     hitDat.surfaceColor = colcol;
                     validbsdfNEE = EvaluateBsdf(hitDat, PrevDirection, to_light, norm, bsdf_pdf, bsdf_value, pixel_index);
                 #else
-                    if((UseReSTIRGI && CurBounce == 0) || (UseASVGF && (CurBounce == GetBounceData(Color.MetRoughIsSpec) - 2 && CurBounce > 0))) hitDat.surfaceColor = 1.0f;
+                    if((hitDat.DisplacementTex <= 0 && UseReSTIRGI && CurBounce == 0) || (UseASVGF && (CurBounce == GetBounceData(Color.MetRoughIsSpec) - 2 && CurBounce > 0))) hitDat.surfaceColor = 1.0f;
                     bool validbsdfNEE = EvaluateBsdf(hitDat, PrevDirection, to_light, norm, bsdf_pdf, bsdf_value, pixel_index);
                     if((UseASVGF && (CurBounce == GetBounceData(Color.MetRoughIsSpec) - 2 && CurBounce > 0))) bsdf_value *= Color.Data.xyz;
                 #endif
@@ -633,10 +633,10 @@ inline void calcFinalColor(SmallerRay ray, inout ColData Color, MaterialData hit
                         uint index3;
                         #ifdef RadCache
                             bool TempTemp = (CurBounce != GetBounceData(CachePathLength) - 2);
-                            if(UseReSTIRGI && !TempTemp && CurBounce == 0) Illum *= (bsdf_value == 0) ? 1 : rcp(bsdf_value);                    
+                            if(hitDat.DisplacementTex <= 0 && UseReSTIRGI && !TempTemp && CurBounce == 0) Illum *= (bsdf_value == 0) ? 1 : rcp(bsdf_value);                    
                         #else
                             bool TempTemp = (CurBounce != GetBounceData(Color.MetRoughIsSpec) - 2);
-                            if(UseReSTIRGI && CurBounce == 0) Illum *= (bsdf_value == 0) ? 1 : rcp(bsdf_value);                    
+                            if(hitDat.DisplacementTex <= 0 && UseReSTIRGI && CurBounce == 0) Illum *= (bsdf_value == 0) ? 1 : rcp(bsdf_value);                    
                         #endif
                         ShadowRayData ShadRay = {pos, 
                                                         packRGBE(bsdf_diffuse), 

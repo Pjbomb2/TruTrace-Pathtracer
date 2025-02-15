@@ -496,6 +496,8 @@ namespace TrueTrace {
                     if (GotSentBack) Offset = DoneMats.IndexOf(SharedMaterials[i]);
                     else DoneMats.Add(SharedMaterials[i]);
 
+                    CurMat.DisplacementTexScaleOffset = obj.DisplacementTexScaleOffset[i];
+
                     TempObj.Obj = obj;
                     TempObj.ObjIndex = i;
                     int Index = AssetManager.ShaderNames.IndexOf(SharedMaterials[i].shader.name);
@@ -608,7 +610,6 @@ namespace TrueTrace {
                     if(JustCreated) {
                         CurMat.SecondaryNormalTexScaleOffset = TempScale;
                         CurMat.SecondaryAlbedoTexScaleOffset = TempScale;
-                        CurMat.DisplacementTexScaleOffset = TempScale;
                         CurMat.AlbedoTextureScale = TempScale;
                         CurMat.SecondaryTextureScaleOffset = TempScale;
                         CurMat.NormalTexScaleOffset = TempScale;
@@ -1290,10 +1291,11 @@ namespace TrueTrace {
             float height = Vector3.Cross(sideAB, sideBC).magnitude;
             return new Vector2(width, height);
         }
-        public float WMAX = 1.0f;
+        public float WMAX = 0.2f;
 
         public unsafe async Task BuildTotal() {
             // if(HasCompleted) return;
+            if(WMAX == 0) WMAX = 0.2f;
             int IllumTriCount = 0;
             CudaTriangle TempTri = new CudaTriangle();
             Matrix4x4 ParentMatInv = CachedTransforms[0].WTL;
@@ -1399,6 +1401,8 @@ namespace TrueTrace {
 
                                 // Interpolate UV coordinates
                                 Vector2 uv = UVVA * w + UVVB * u + UVVC * v;
+                                uv = new Vector2(uv.x * _Materials[(int)TempTri.MatDat].DisplacementTexScaleOffset.x + _Materials[(int)TempTri.MatDat].DisplacementTexScaleOffset.z, uv.x * _Materials[(int)TempTri.MatDat].DisplacementTexScaleOffset.y + _Materials[(int)TempTri.MatDat].DisplacementTexScaleOffset.w);
+                                uv = new Vector2(uv.x / 1.0f - (int)(uv.x / 1.0f), uv.y / 1.0f - (int)(uv.y / 1.0f));
                                 int UVIndex = (int)Mathf.Max((Mathf.Floor(uv.y * (DisplacementTexWidthHeight[ThisIndex].y)) * DisplacementTexWidthHeight[ThisIndex].x + Mathf.Floor(uv.x * DisplacementTexWidthHeight[ThisIndex].x)),0);
                                 // if(UVIndex >= DisplacementTexWidthHeight[ThisIndex].y * DisplacementTexWidthHeight[ThisIndex].x) Debug.LogError("FUCK");
                                 UVIndex = (int)Mathf.Min(DisplacementTexWidthHeight[ThisIndex].y * DisplacementTexWidthHeight[ThisIndex].x-1, UVIndex);
